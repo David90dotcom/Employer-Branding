@@ -1,0 +1,35 @@
+# Generierte und hochgeladene Bilder
+webapp/static/generated/*
+!webapp/static/generated/.gitkeep
+webapp/static/indexsave.txt
+
+# Lokale Test- und Altdateien
+webapp/workflowTest.text
+webapp/presets.json
+
+# Geheimnisse und lokale Konfiguration
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Entwicklungsdateien
+.vscode/
+.idea/
+
+# Virtuelle Umgebung
+webapp_env/
+
+# Protokolldateien
+*.log
+
+# Lokale Sicherungsdateien
+mainSave.txt
+
+# Große lokale KI-Modelle
+models/

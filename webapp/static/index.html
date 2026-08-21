@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>AI Image Edit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+
+<body>
+
+  <div class="topbar">
+    <div>
+      <h2>AI Image Edit</h2>
+      <div class="subtitle">
+        Lokale ComfyUI-Bildbearbeitung mit serverseitiger Prompt-Erzeugung und Kampagnen-Banner
+      </div>
+    </div>
+
+    <div class="badge">UI-Version: Server-Prompt-Banner-v1</div>
+  </div>
+
+  <div class="stack">
+
+    <div class="card">
+      <div id="drop" class="drop">
+        <div id="dropPlaceholder" class="drop-placeholder">
+          Bild hier hineinziehen oder klicken
+        </div>
+
+        <img
+          id="inputPreview"
+          style="display:none;"
+          alt="Input Vorschau"
+        >
+      </div>
+
+      <input
+        id="filePicker"
+        type="file"
+        accept="image/*"
+        style="display:none;"
+      >
+    </div>
+
+    <div class="card">
+
+      <div id="fieldsGrid" class="grid"></div>
+
+      <div class="field" style="margin-top: 18px;">
+        <label for="extraPrompt">
+          Zusätzlicher Freitext-Prompt
+        </label>
+
+        <textarea
+          id="extraPrompt"
+          placeholder="Optional: weitere Details ergänzen, z. B. accessories, mood, background details ..."
+        ></textarea>
+      </div>
+
+      <div class="field" style="margin-top: 18px;">
+        <label>
+          <input id="bannerEnabled" type="checkbox">
+          Textbanner auf Ergebnisbild setzen
+        </label>
+      </div>
+
+      <div id="bannerSettings" style="display:none; margin-top: 12px;">
+
+        <div class="field">
+          <label for="bannerText">
+            Banner-Headline
+          </label>
+
+          <input
+            id="bannerText"
+            type="text"
+            maxlength="90"
+            placeholder="z. B. Deine Zukunft beginnt hier"
+          >
+        </div>
+
+        <div class="field" style="margin-top: 12px;">
+          <label for="bannerSubtext">
+            Subheadline optional
+          </label>
+
+          <input
+            id="bannerSubtext"
+            type="text"
+            maxlength="140"
+            placeholder="z. B. Werde Teil unseres Teams"
+          >
+        </div>
+
+        <div class="grid" style="margin-top: 12px;">
+
+          <div class="field">
+            <label for="bannerPosition">
+              Bannerposition
+            </label>
+
+            <select id="bannerPosition">
+              <option value="auto">Automatisch</option>
+              <option value="bottom">Unten</option>
+              <option value="top">Oben</option>
+              <option value="right">Rechts</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="bannerStyle">
+              Bannerstil
+            </label>
+
+            <select id="bannerStyle">
+              <option value="dark_glass">Dunkler Glas-Banner</option>
+              <option value="light_panel">Heller Corporate-Banner</option>
+              <option value="brand_bar">Farbiger Markenbalken</option>
+              <option value="gradient_bottom">Verlauf unten</option>
+              <option value="minimal_shadow">Minimal mit Schatten</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="bannerFont">
+              Schriftstil
+            </label>
+
+            <select id="bannerFont">
+              <option value="modern">Modern Sans</option>
+              <option value="bold">Extra Bold</option>
+              <option value="editorial">Editorial Serif</option>
+              <option value="condensed">Condensed</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="bannerAlign">
+              Textausrichtung
+            </label>
+
+            <select id="bannerAlign">
+              <option value="left">Links</option>
+              <option value="center">Zentriert</option>
+              <option value="right">Rechts</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="bannerColor">
+              Markenfarbe
+            </label>
+
+            <input
+              id="bannerColor"
+              type="color"
+              value="#1457ff"
+            >
+          </div>
+
+        </div>
+      </div>
+
+      <div class="field" style="margin-top: 18px;">
+        <label for="finalPrompt">
+          Finaler Server-Prompt
+        </label>
+
+        <textarea
+          id="finalPrompt"
+          readonly
+        ></textarea>
+      </div>
+
+      <div class="field" style="margin-top: 18px;">
+        <label>
+          Diagnose: gesendete Prompt-Komponenten
+        </label>
+
+        <pre
+          id="promptDebug"
+          style="white-space: pre-wrap; overflow:auto; max-height: 260px;"
+        ></pre>
+      </div>
+
+      <div class="field" style="margin-top: 18px;">
+        <label style="display:flex; gap:10px; align-items:flex-start;">
+          <input id="consentAccepted" type="checkbox" style="margin-top:4px;">
+
+          <span>
+            Ich bestätige, dass ich zur Nutzung des hochgeladenen Bildes berechtigt bin
+            und dass die darauf erkennbare Person der Verarbeitung und Veränderung
+            ihres Bildes für diesen Kampagnenentwurf zugestimmt hat.
+            <br><br>
+            Mir ist bewusst, dass es sich bei dieser Anwendung um einen lokalen
+            Prototyp zur Erstellung von Employer-Branding-Entwürfen handelt.
+            Die erzeugten Bilder sind nicht automatisch zur Veröffentlichung geeignet
+            und müssen vor jeder Nutzung geprüft und freigegeben werden.
+            <br><br>
+            Die Anwendung darf nicht für rechtswidrige, pornografische,
+            diskriminierende, täuschende, beleidigende oder rufschädigende Inhalte
+            verwendet werden. Die Nutzung orientiert sich außerdem an den
+            Nutzungsregeln des eingesetzten Qwen-Edit-Modells, die bestimmte
+            missbräuchliche und unzulässige Inhalte ausschließen.
+          </span>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button id="run" type="button">
+          Start
+        </button>
+      </div>
+
+      <div class="progress">
+        <div id="bar" class="bar"></div>
+      </div>
+
+      <div id="status" class="status">
+        Bereit.
+      </div>
+    </div>
+
+    <div>
+      <h3>Ergebnisse</h3>
+      <div id="gallery" class="gallery"></div>
+    </div>
+
+  </div>
+
+  <script>
+    const drop = document.getElementById("drop");
+    const dropPlaceholder = document.getElementById("dropPlaceholder");
+    const inputPreview = document.getElementById("inputPreview");
+    const filePicker = document.getElementById("filePicker");
+    const fieldsGrid = document.getElementById("fieldsGrid");
+    const extraPrompt = document.getElementById("extraPrompt");
+    const finalPrompt = document.getElementById("finalPrompt");
+    const promptDebug = document.getElementById("promptDebug");
+    const runButton = document.getElementById("run");
+    const consentAccepted = document.getElementById("consentAccepted");
+    const bar = document.getElementById("bar");
+    const statusEl = document.getElementById("status");
+    const gallery = document.getElementById("gallery");
+
+    const bannerEnabled = document.getElementById("bannerEnabled");
+    const bannerSettings = document.getElementById("bannerSettings");
+    const bannerText = document.getElementById("bannerText");
+    const bannerSubtext = document.getElementById("bannerSubtext");
+    const bannerPosition = document.getElementById("bannerPosition");
+    const bannerStyle = document.getElementById("bannerStyle");
+    const bannerFont = document.getElementById("bannerFont");
+    const bannerAlign = document.getElementById("bannerAlign");
+    const bannerColor = document.getElementById("bannerColor");
+
+    let selectedFile = null;
+    let previewUrl = null;
+    let progressTimer = null;
+    let previewTimer = null;
+    let lastServerPrompt = "";
+
+
+    // ------------------------------------------------------------
+    // Allgemeine Hilfsfunktionen
+    // ------------------------------------------------------------
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+
+    function setProgress(value) {
+      const normalizedValue = Math.max(
+        0,
+        Math.min(100, Number(value) || 0)
+      );
+
+      bar.style.width = `${normalizedValue}%`;
+    }
+
+
+    function stringifySafe(value) {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
+      }
+    }
+
+
+    function formatServerError(data, status) {
+      if (!data) {
+        return `HTTP ${status}`;
+      }
+
+      if (typeof data === "string") {
+        return data;
+      }
+
+      if (typeof data.detail === "string") {
+        return data.detail;
+      }
+
+      if (data.detail !== undefined && data.detail !== null) {
+        return stringifySafe(data.detail);
+      }
+
+      if (data.message) {
+        return String(data.message);
+      }
+
+      return stringifySafe(data);
+    }
+
+
+    async function readResponseData(response) {
+      const text = await response.text();
+
+      if (!text) {
+        return null;
+      }
+
+      try {
+        return JSON.parse(text);
+      } catch {
+        return text;
+      }
+    }
+
+
+    function updateDebugBox(components, prompt, errorMessage = "") {
+      const lines = [];
+
+      lines.push("Komponenten, die an FastAPI gesendet werden:");
+      lines.push("");
+      lines.push(stringifySafe(components || {}));
+      lines.push("");
+
+      if (errorMessage) {
+        lines.push("Fehler:");
+        lines.push(errorMessage);
+        lines.push("");
+      }
+
+      lines.push("Server-Prompt:");
+      lines.push(prompt || "");
+
+      promptDebug.textContent = lines.join("\n");
+    }
+
+
+    // ------------------------------------------------------------
+    // Bild-Vorschau
+    // ------------------------------------------------------------
+
+    function showInputPreview(file) {
+      if (!file) {
+        return;
+      }
+
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+
+      previewUrl = URL.createObjectURL(file);
+
+      inputPreview.src = previewUrl;
+      inputPreview.style.display = "block";
+      dropPlaceholder.style.display = "none";
+    }
+
+
+    function setFile(file) {
+      if (!file) {
+        return;
+      }
+
+      if (!file.type.startsWith("image/")) {
+        alert("Bitte eine gültige Bilddatei auswählen.");
+        return;
+      }
+
+      selectedFile = file;
+
+      showInputPreview(file);
+
+      gallery.replaceChildren();
+      setStatus(`Ausgewählt: ${file.name}`);
+    }
+
+
+    // ------------------------------------------------------------
+    // Banner
+    // ------------------------------------------------------------
+
+    function updateBannerVisibility() {
+      bannerSettings.style.display = bannerEnabled.checked
+        ? "block"
+        : "none";
+
+      schedulePromptPreview();
+    }
+
+
+    function collectBannerSettings() {
+      return {
+        enabled: Boolean(bannerEnabled.checked),
+        text: bannerText.value.trim(),
+        subtext: bannerSubtext.value.trim(),
+        position: bannerPosition.value,
+        style: bannerStyle.value,
+        font: bannerFont.value,
+        align: bannerAlign.value,
+        color: bannerColor.value
+      };
+    }
+
+
+    // ------------------------------------------------------------
+    // Prompt-Komponenten
+    // ------------------------------------------------------------
+
+    function collectPromptComponents() {
+      const components = {};
+
+      const selects = fieldsGrid.querySelectorAll("select");
+
+      selects.forEach(select => {
+        components[select.id] = String(select.value || "").trim();
+      });
+
+      components.extraPrompt = extraPrompt.value.trim();
+      components.banner = collectBannerSettings();
+
+      return components;
+    }
+
+
+    async function requestPromptPreview() {
+      const components = collectPromptComponents();
+
+      try {
+        const response = await fetch(
+          "/api/preview-prompt",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            cache: "no-store",
+            body: JSON.stringify({
+              components
+            })
+          }
+        );
+
+        const data = await readResponseData(response);
+
+        if (!response.ok) {
+          throw new Error(
+            formatServerError(data, response.status)
+          );
+        }
+
+        lastServerPrompt = data?.prompt || "";
+        finalPrompt.value = lastServerPrompt;
+
+        updateDebugBox(
+          data?.components || components,
+          lastServerPrompt
+        );
+
+        console.log(
+          "PROMPT-KOMPONENTEN:",
+          data?.components || components
+        );
+
+        console.log(
+          "SERVER-PROMPT:",
+          lastServerPrompt
+        );
+
+        return {
+          components: data?.components || components,
+          prompt: lastServerPrompt,
+          ok: true
+        };
+
+      } catch (error) {
+        console.error(
+          "Fehler bei Prompt-Vorschau:",
+          error
+        );
+
+        finalPrompt.value = "";
+        lastServerPrompt = "";
+
+        updateDebugBox(
+          components,
+          "",
+          error.message
+        );
+
+        return {
+          components,
+          prompt: "",
+          ok: false,
+          error
+        };
+      }
+    }
+
+
+    function schedulePromptPreview() {
+      if (previewTimer !== null) {
+        clearTimeout(previewTimer);
+      }
+
+      previewTimer = setTimeout(
+        requestPromptPreview,
+        150
+      );
+    }
+
+
+    // ------------------------------------------------------------
+    // UI-Felder laden
+    // ------------------------------------------------------------
+
+    async function loadUiFields() {
+      setStatus("UI-Felder werden geladen ...");
+
+      try {
+        const response = await fetch(
+          `/api/ui-fields?t=${Date.now()}`,
+          {
+            method: "GET",
+            cache: "no-store"
+          }
+        );
+
+        const data = await readResponseData(response);
+
+        if (!response.ok) {
+          throw new Error(
+            formatServerError(data, response.status)
+          );
+        }
+
+        if (!Array.isArray(data)) {
+          throw new Error(
+            "Die Antwort von /api/ui-fields ist kein Array."
+          );
+        }
+
+        fieldsGrid.replaceChildren();
+
+        for (const field of data) {
+          if (
+            !field ||
+            typeof field.id !== "string" ||
+            typeof field.label !== "string" ||
+            !Array.isArray(field.options)
+          ) {
+            console.warn(
+              "Ungültige Felddefinition übersprungen:",
+              field
+            );
+
+            continue;
+          }
+
+          const wrapper = document.createElement("div");
+          wrapper.className = "field";
+
+          const label = document.createElement("label");
+          label.htmlFor = field.id;
+          label.textContent = field.label;
+
+          const select = document.createElement("select");
+          select.id = field.id;
+          select.name = field.id;
+
+          for (const optionData of field.options) {
+            const option = document.createElement("option");
+
+            option.value = String(optionData.value ?? "");
+            option.textContent = String(optionData.label ?? "");
+
+            select.appendChild(option);
+          }
+
+          select.addEventListener(
+            "change",
+            schedulePromptPreview
+          );
+
+          select.addEventListener(
+            "input",
+            schedulePromptPreview
+          );
+
+          wrapper.appendChild(label);
+          wrapper.appendChild(select);
+
+          fieldsGrid.appendChild(wrapper);
+        }
+
+        console.log(
+          "Geladene UI-Felder:",
+          data.map(field => field.id)
+        );
+
+        await requestPromptPreview();
+
+        setStatus("Bereit.");
+
+      } catch (error) {
+        console.error(
+          "Fehler beim Laden der UI-Felder:",
+          error
+        );
+
+        setStatus(
+          `Fehler beim Laden der UI-Felder: ${error.message}`
+        );
+
+        updateDebugBox(
+          {},
+          "",
+          error.message
+        );
+      }
+    }
+
+
+    // ------------------------------------------------------------
+    // Datei-Auswahl
+    // ------------------------------------------------------------
+
+    drop.addEventListener("click", () => {
+      filePicker.click();
+    });
+
+
+    filePicker.addEventListener("change", event => {
+      const file = event.target.files?.[0];
+
+      if (file) {
+        setFile(file);
+      }
+    });
+
+
+    drop.addEventListener("dragover", event => {
+      event.preventDefault();
+      drop.classList.add("dragover");
+    });
+
+
+    drop.addEventListener("dragleave", () => {
+      drop.classList.remove("dragover");
+    });
+
+
+    drop.addEventListener("drop", event => {
+      event.preventDefault();
+      drop.classList.remove("dragover");
+
+      const file = event.dataTransfer.files?.[0];
+
+      if (file) {
+        setFile(file);
+      }
+    });
+
+
+    // ------------------------------------------------------------
+    // Eingabe-Events
+    // ------------------------------------------------------------
+
+    extraPrompt.addEventListener(
+      "input",
+      schedulePromptPreview
+    );
+
+    bannerEnabled.addEventListener(
+      "change",
+      updateBannerVisibility
+    );
+
+    bannerText.addEventListener(
+      "input",
+      schedulePromptPreview
+    );
+
+    bannerSubtext.addEventListener(
+      "input",
+      schedulePromptPreview
+    );
+
+    bannerPosition.addEventListener(
+      "change",
+      schedulePromptPreview
+    );
+
+    bannerStyle.addEventListener(
+      "change",
+      schedulePromptPreview
+    );
+
+    bannerFont.addEventListener(
+      "change",
+      schedulePromptPreview
+    );
+
+    bannerAlign.addEventListener(
+      "change",
+      schedulePromptPreview
+    );
+
+    bannerColor.addEventListener(
+      "input",
+      schedulePromptPreview
+    );
+
+
+    // ------------------------------------------------------------
+    // Fortschritt
+    // ------------------------------------------------------------
+
+    function stopProgressPolling() {
+      if (progressTimer !== null) {
+        clearTimeout(progressTimer);
+        progressTimer = null;
+      }
+    }
+
+
+    async function pollProgress() {
+      stopProgressPolling();
+
+      try {
+        const response = await fetch(
+          `/api/progress?t=${Date.now()}`,
+          {
+            method: "GET",
+            cache: "no-store"
+          }
+        );
+
+        const data = await readResponseData(response);
+
+        if (!response.ok) {
+          throw new Error(
+            formatServerError(data, response.status)
+          );
+        }
+
+        const value = Number(data?.value) || 0;
+
+        setProgress(value);
+
+        if (value < 100) {
+          setStatus(`Rendering: ${value}%`);
+
+          progressTimer = setTimeout(
+            pollProgress,
+            250
+          );
+        }
+
+      } catch (error) {
+        console.error(
+          "Fehler beim Abrufen des Fortschritts:",
+          error
+        );
+
+        setStatus(
+          `Fehler beim Abrufen des Fortschritts: ${error.message}`
+        );
+      }
+    }
+
+
+    // ------------------------------------------------------------
+    // Workflow starten
+    // ------------------------------------------------------------
+
+    runButton.addEventListener("click", async () => {
+      if (!selectedFile) {
+        alert("Bitte zuerst ein Bild auswählen.");
+        return;
+      }
+
+      if (!consentAccepted.checked) {
+        alert(
+          "Bitte bestätige zuerst die Einwilligung und die Nutzungsbedingungen für die Bildverarbeitung."
+        );
+
+        setStatus(
+          "Start abgebrochen: Einwilligung/Nutzungshinweis wurde nicht bestätigt."
+        );
+
+        return;
+      }
+
+      const preview = await requestPromptPreview();
+
+      if (!preview.ok) {
+        setStatus(
+          `Fehler bei Prompt-Vorschau: ${preview.error?.message || "Unbekannter Fehler"}`
+        );
+        return;
+      }
+
+      const components = preview.components;
+      const prompt = preview.prompt;
+
+      if (!prompt) {
+        alert(
+          "Bitte mindestens eine Auswahl treffen oder einen Freitext-Prompt eingeben."
+        );
+
+        return;
+      }
+
+      console.log(
+        "PROMPT-KOMPONENTEN WERDEN AN FASTAPI GESENDET:",
+        components
+      );
+
+      console.log(
+        "VORSCHAU-PROMPT:",
+        prompt
+      );
+
+      runButton.disabled = true;
+
+      gallery.replaceChildren();
+      setProgress(0);
+      setStatus("Upload läuft ...");
+
+      const formData = new FormData();
+
+      formData.append(
+        "file",
+        selectedFile,
+        selectedFile.name
+      );
+
+      formData.append(
+        "prompt_components",
+        JSON.stringify(components)
+      );
+
+      pollProgress();
+
+      try {
+        const response = await fetch(
+          "/api/run",
+          {
+            method: "POST",
+            body: formData,
+            cache: "no-store"
+          }
+        );
+
+        const data = await readResponseData(response);
+
+        if (!response.ok) {
+          throw new Error(
+            formatServerError(data, response.status)
+          );
+        }
+
+        console.log(
+          "ANTWORT VOM BACKEND:",
+          data
+        );
+
+        if (data?.submitted_prompt) {
+          finalPrompt.value = data.submitted_prompt;
+          lastServerPrompt = data.submitted_prompt;
+        }
+
+        if (data?.prompt_components) {
+          updateDebugBox(
+            data.prompt_components,
+            data.submitted_prompt || ""
+          );
+        }
+
+        const urls = Array.isArray(data?.view_urls)
+          ? data.view_urls
+          : [];
+
+        gallery.replaceChildren();
+
+        for (const url of urls) {
+          const item = document.createElement("div");
+          item.className = "gallery-item";
+
+          const image = document.createElement("img");
+
+          const separator = url.includes("?")
+            ? "&"
+            : "?";
+
+          image.src =
+            `${url}${separator}t=${Date.now()}_${Math.random()}`;
+
+          image.alt = "Ergebnis";
+
+          item.appendChild(image);
+          gallery.appendChild(item);
+        }
+
+        stopProgressPolling();
+        setProgress(100);
+
+        setStatus(
+          `Fertig. ${urls.length} Bild(er) erhalten.`
+        );
+
+      } catch (error) {
+        stopProgressPolling();
+
+        console.error(
+          "Fehler beim Ausführen des Workflows:",
+          error
+        );
+
+        setStatus(
+          `Fehler: ${error.message}`
+        );
+
+        updateDebugBox(
+          components,
+          prompt,
+          error.message
+        );
+
+      } finally {
+        runButton.disabled = false;
+      }
+    });
+
+
+    // ------------------------------------------------------------
+    // Initialisierung
+    // ------------------------------------------------------------
+
+    updateBannerVisibility();
+    loadUiFields();
+  </script>
+
+</body>
+</html>
