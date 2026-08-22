@@ -1,0 +1,342 @@
+[
+  {
+    "id": "workContext",
+    "label": "Praxiswelt / Tätigkeit",
+    "type": "select",
+    "options": [
+      {
+        "label": "Bitte auswählen",
+        "value": ""
+      },
+      {
+        "label": "Filiale / Lebensmitteleinzelhandel",
+        "value": "A realistic modern food-retail store during normal operations. The main person coordinates a clearly visible task involving shelves, products, a tablet, or a short team briefing. The store is organized, credible, and free of readable brand names or company logos."
+      },
+      {
+        "label": "Logistikzentrum / Warenfluss",
+        "value": "A realistic distribution center with organized shelves, pallets, packages, a handheld scanner, and clearly marked work zones without readable company branding. The main person checks or coordinates a visible logistics process."
+      },
+      {
+        "label": "Fachbereich / Verwaltung",
+        "value": "A realistic functional department or administrative office. The main person works with a laptop, dashboard, notes, and project documents on a concrete analytical or organizational task."
+      },
+      {
+        "label": "Duales Studium / Praxisprojekt",
+        "value": "A credible practical learning situation within a dual-study program. The main person combines an academic perspective with a visible workplace task and receives or contributes professional input."
+      },
+      {
+        "label": "Digitale Projektarbeit",
+        "value": "A realistic digital project environment with a laptop, tablet, simple dashboard, notes, and planning material. The main person coordinates, checks, or presents a concrete project task."
+      }
+    ]
+  },
+  {
+    "id": "personConcept",
+    "label": "Fiktive Personendarstellung",
+    "type": "select",
+    "options": [
+      {
+        "label": "Bitte auswählen",
+        "value": ""
+      },
+      {
+        "label": "Eine junge erwachsene Person",
+        "value": "One fictional young adult between approximately 18 and 25 is the clear main subject. The person looks natural, credible, and appropriate for an early-career employer-branding campaign."
+      },
+      {
+        "label": "Eine Person im dualen Studium",
+        "value": "One fictional young adult in a dual-study context is the clear main subject. The portrayal communicates curiosity, growing responsibility, and practical learning without presenting the person as a real employee."
+      },
+      {
+        "label": "Zwei gleichwertige Personen",
+        "value": "Two fictional young adults are shown with equal visual importance while working on the same credible task. Neither person is treated as a token or decorative background figure."
+      },
+      {
+        "label": "Kleines vielfältiges Team",
+        "value": "A small fictional team of three people with naturally varied appearances collaborates as equals. Diversity is shown without stereotypes, exaggerated symbolism, or tokenism."
+      }
+    ]
+  },
+  {
+    "id": "action",
+    "label": "Arbeitsweise / Zusammenarbeit",
+    "type": "select",
+    "options": [
+      {
+        "label": "Keine Vorgabe",
+        "value": ""
+      },
+      {
+        "label": "Konzentriert an einer Aufgabe",
+        "value": "The main person is focused on one clearly visible and plausible task. Hands, gaze, and relevant work objects align naturally with the activity."
+      },
+      {
+        "label": "Austausch mit einer Person",
+        "value": "The main person exchanges information with one colleague while both focus on the same document, screen, product, tool, or work object."
+      },
+      {
+        "label": "Praktische Anleitung",
+        "value": "A concrete learning moment is visible: one person explains a work step while the other follows the same object, process, or document."
+      },
+      {
+        "label": "Team bespricht eine Aufgabe",
+        "value": "A small team briefly discusses a concrete task around a shared table, screen, plan, product display, or work area."
+      },
+      {
+        "label": "Ergebnis prüfen oder übergeben",
+        "value": "The main person checks or hands over a visible work result, document, product arrangement, package, plan, or project result."
+      }
+    ]
+  },
+  {
+    "id": "expression",
+    "label": "Gesichtsausdruck / Ausstrahlung",
+    "type": "select",
+    "options": [
+      {
+        "label": "Keine Vorgabe",
+        "value": ""
+      },
+      {
+        "label": "Natürlich freundlich",
+        "value": "a natural slight smile, relaxed eyes, and credible facial detail"
+      },
+      {
+        "label": "Ruhig selbstsicher",
+        "value": "a calm confident expression with steady eyes and a relaxed mouth"
+      },
+      {
+        "label": "Konzentriert",
+        "value": "a focused expression directed toward the visible task"
+      },
+      {
+        "label": "Motiviert",
+        "value": "an alert and engaged expression with natural positive energy"
+      },
+      {
+        "label": "Offen und einladend",
+        "value": "an open approachable expression with relaxed cheeks and authentic warmth"
+      }
+    ]
+  },
+  {
+    "id": "outfit",
+    "label": "Kleidung / Rollenwirkung",
+    "type": "select",
+    "options": [
+      {
+        "label": "Keine Vorgabe",
+        "value": ""
+      },
+      {
+        "label": "Schlicht professionell",
+        "value": "wearing simple, well-fitted professional clothing without visible logos, slogans, name tags, or recognizable brand colors"
+      },
+      {
+        "label": "Business casual",
+        "value": "wearing a plain shirt or blouse with neat trousers and practical, understated shoes"
+      },
+      {
+        "label": "Moderner Arbeitslook",
+        "value": "wearing a clean overshirt, plain shirt, dark trousers, and practical shoes suitable for the visible workplace"
+      },
+      {
+        "label": "Tech-casual",
+        "value": "wearing a plain sweater, shirt, or casual jacket with neat trousers and no visible logos"
+      }
+    ]
+  },
+  {
+    "id": "framing",
+    "label": "Bildausschnitt",
+    "type": "select",
+    "options": [
+      {
+        "label": "Keine Vorgabe",
+        "value": ""
+      },
+      {
+        "label": "Nahes Porträt",
+        "value": "a close-up portrait showing the head, face, and upper shoulders"
+      },
+      {
+        "label": "Halbkörper",
+        "value": "a medium shot showing the main person from head to waist and enough workplace context to understand the task"
+      },
+      {
+        "label": "Dreiviertelkörper",
+        "value": "a three-quarter body shot showing the main person from head to knees with relevant work objects"
+      },
+      {
+        "label": "Ganzkörper",
+        "value": "a full-body shot showing the entire main person and a credible workplace environment"
+      },
+      {
+        "label": "Weite Arbeitsszene",
+        "value": "a wide environmental shot in which people and workplace remain clearly recognizable"
+      }
+    ]
+  },
+  {
+    "id": "pose",
+    "label": "Körperhaltung",
+    "type": "select",
+    "options": [
+      {
+        "label": "Keine Vorgabe",
+        "value": ""
+      },
+      {
+        "label": "Natürlich stehend",
+        "value": "standing naturally with balanced weight and relaxed shoulders"
+      },
+      {
+        "label": "Sitzend am Arbeitsplatz",
+        "value": "sitting upright at a workstation with hands placed naturally near the visible task"
+      },
+      {
+        "label": "Aktiv bei der Tätigkeit",
+        "value": "actively performing the visible workplace task with anatomically plausible hand placement"
+      },
+      {
+        "label": "Im Gehen",
+        "value": "walking naturally through the workplace while remaining connected to the depicted activity"
+      }
+    ]
+  },
+  {
+    "id": "gaze",
+    "label": "Blickführung",
+    "type": "select",
+    "options": [
+      {
+        "label": "Keine Vorgabe",
+        "value": ""
+      },
+      {
+        "label": "Blick in die Kamera",
+        "value": "looking directly into the camera with both eyes clearly visible"
+      },
+      {
+        "label": "Blick auf die Tätigkeit",
+        "value": "looking naturally at the document, screen, product, tool, package, or work object used in the scene"
+      },
+      {
+        "label": "Blick zur anderen Person",
+        "value": "looking naturally toward the colleague involved in the same task"
+      },
+      {
+        "label": "Blick leicht seitlich",
+        "value": "looking slightly to the side with a natural head position"
+      }
+    ]
+  },
+  {
+    "id": "cameraAngle",
+    "label": "Perspektive",
+    "type": "select",
+    "options": [
+      {
+        "label": "Keine Vorgabe",
+        "value": ""
+      },
+      {
+        "label": "Auf Augenhöhe",
+        "value": "an eye-level camera perspective with natural proportions"
+      },
+      {
+        "label": "Frontansicht",
+        "value": "a clear front-facing camera view"
+      },
+      {
+        "label": "Dreiviertelansicht",
+        "value": "a natural three-quarter camera view showing facial depth and workplace context"
+      },
+      {
+        "label": "Reportageperspektive",
+        "value": "a candid documentary camera perspective that feels observed rather than staged"
+      }
+    ]
+  },
+  {
+    "id": "lighting",
+    "label": "Licht / Atmosphäre",
+    "type": "select",
+    "options": [
+      {
+        "label": "Keine Vorgabe",
+        "value": ""
+      },
+      {
+        "label": "Natürliches Tageslicht",
+        "value": "soft natural daylight with gentle shadows and realistic skin tones"
+      },
+      {
+        "label": "Helles Arbeitslicht",
+        "value": "clean, even workplace lighting with clearly visible task details"
+      },
+      {
+        "label": "Weiches Kampagnenlicht",
+        "value": "soft professional campaign lighting with subtle depth and realistic facial detail"
+      },
+      {
+        "label": "Dynamisches Seitenlicht",
+        "value": "controlled side lighting that adds depth without becoming theatrical or unrealistic"
+      }
+    ]
+  },
+  {
+    "id": "imageEffect",
+    "label": "Bildwirkung",
+    "type": "select",
+    "options": [
+      {
+        "label": "Keine Vorgabe",
+        "value": ""
+      },
+      {
+        "label": "Authentisch und nahbar",
+        "value": "authentic, approachable employer-brand photography with natural colors and credible workplace detail"
+      },
+      {
+        "label": "Modern und dynamisch",
+        "value": "modern dynamic campaign photography with clear visual hierarchy and restrained corporate color accents"
+      },
+      {
+        "label": "Professionell und verlässlich",
+        "value": "professional, trustworthy employer-brand photography with balanced composition and realistic detail"
+      },
+      {
+        "label": "Jung und zukunftsorientiert",
+        "value": "fresh, future-oriented campaign photography without exaggerated youth stereotypes or artificial enthusiasm"
+      }
+    ]
+  },
+  {
+    "id": "aspectRatio",
+    "label": "Ausgabeformat",
+    "type": "select",
+    "options": [
+      {
+        "label": "Quadratisch 1:1 – Social Media",
+        "value": "1:1"
+      },
+      {
+        "label": "Querformat 16:9 – Website",
+        "value": "16:9"
+      },
+      {
+        "label": "Hochformat 9:16 – Story",
+        "value": "9:16"
+      },
+      {
+        "label": "Querformat 4:3",
+        "value": "4:3"
+      },
+      {
+        "label": "Hochformat 3:4",
+        "value": "3:4"
+      }
+    ]
+  }
+]

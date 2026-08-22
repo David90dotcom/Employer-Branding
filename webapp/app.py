@@ -1,8 +1,9 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Body
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Body, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 import json
+import os
 import uuid
 import requests
 import time
@@ -11,6 +12,7 @@ import websocket
 
 from io import BytesIO
 from pathlib import Path
+from typing import Optional
 from urllib.parse import urlencode
 
 from PIL import Image, ImageDraw, ImageFont
@@ -19,8 +21,7 @@ from PIL import Image, ImageDraw, ImageFont
 COMFY = "http://127.0.0.1:8188"
 
 BASE_DIR = Path(__file__).resolve().parent
-WORKFLOW_PATH = BASE_DIR / "workflow_template.json"
-UI_FIELDS_PATH = BASE_DIR / "ui_fields.json"
+MODEL_CONFIG_PATH = BASE_DIR / "model_config.json"
 INDEX_PATH = BASE_DIR / "static" / "index.html"
 
 GENERATED_DIR = BASE_DIR / "static" / "generated"
@@ -39,9 +40,31 @@ app.mount(
     name="static"
 )
 
-WORKFLOW_TEMPLATE = json.loads(
-    WORKFLOW_PATH.read_text(encoding="utf-8")
+MODEL_CONFIG = json.loads(
+    MODEL_CONFIG_PATH.read_text(encoding="utf-8")
 )
+
+DEFAULT_MODE = MODEL_CONFIG.get("default_mode", "text_to_image")
+MODE_CONFIGS = MODEL_CONFIG.get("modes", {})
+
+if DEFAULT_MODE not in MODE_CONFIGS:
+    raise RuntimeError(
+        f"Unknown default mode in {MODEL_CONFIG_PATH.name}: {DEFAULT_MODE}"
+    )
+
+WORKFLOW_TEMPLATES = {}
+
+for mode_name, mode_config in MODE_CONFIGS.items():
+    workflow_path = BASE_DIR / mode_config["workflow"]
+
+    WORKFLOW_TEMPLATES[mode_name] = json.loads(
+        workflow_path.read_text(encoding="utf-8")
+    )
+
+DEBUG_PROMPTS = os.getenv(
+    "EMPLOYER_BRANDING_DEBUG_PROMPTS",
+    "0"
+).strip().lower() in {"1", "true", "yes", "on"}
 
 progress_state = {
     "value": 0
@@ -52,12 +75,32 @@ progress_state = {
 # Grundfunktionen
 # ---------------------------------------------------------------------------
 
-def deep_copy_workflow():
-    return json.loads(json.dumps(WORKFLOW_TEMPLATE))
+def normalize_mode(mode):
+    normalized = str(mode or DEFAULT_MODE).strip()
+
+    if normalized not in MODE_CONFIGS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown generation mode: {normalized}"
+        )
+
+    return normalized
 
 
-def load_ui_fields():
-    return json.loads(UI_FIELDS_PATH.read_text(encoding="utf-8"))
+def get_mode_config(mode):
+    return MODE_CONFIGS[normalize_mode(mode)]
+
+
+def deep_copy_workflow(mode):
+    normalized_mode = normalize_mode(mode)
+    return json.loads(json.dumps(WORKFLOW_TEMPLATES[normalized_mode]))
+
+
+def load_ui_fields(mode):
+    mode_config = get_mode_config(mode)
+    fields_path = BASE_DIR / mode_config["ui_fields"]
+
+    return json.loads(fields_path.read_text(encoding="utf-8"))
 
 
 def no_cache_headers():
@@ -72,8 +115,8 @@ def no_cache_headers():
 # Prompt-Komponenten prüfen
 # ---------------------------------------------------------------------------
 
-def get_allowed_values_by_field():
-    fields = load_ui_fields()
+def get_allowed_values_by_field(mode):
+    fields = load_ui_fields(mode)
     allowed = {}
 
     for field in fields:
@@ -175,10 +218,11 @@ def normalize_banner_settings(raw_components):
     }
 
 
-def normalize_prompt_components(raw_components):
+def normalize_prompt_components(raw_components, mode=DEFAULT_MODE):
     """
     Nimmt die vom Browser gesendeten Werte entgegen,
-    prüft sie gegen ui_fields.json und gibt saubere Komponenten zurück.
+    prüft sie gegen die Felddefinition des gewählten Modus und gibt
+    saubere Komponenten zurück.
     """
     if not isinstance(raw_components, dict):
         raise HTTPException(
@@ -186,7 +230,8 @@ def normalize_prompt_components(raw_components):
             detail="prompt_components must be a JSON object"
         )
 
-    allowed_values_by_field = get_allowed_values_by_field()
+    normalized_mode = normalize_mode(mode)
+    allowed_values_by_field = get_allowed_values_by_field(normalized_mode)
 
     normalized = {}
     invalid_fields = {}
@@ -227,23 +272,18 @@ def normalize_prompt_components(raw_components):
 # Prompt bauen
 # ---------------------------------------------------------------------------
 
-def build_prompt_from_components(components):
-    """
-    Baut aus den serverseitig geprüften Prompt-Komponenten einen klaren,
-    priorisierten Modell-Prompt.
+def build_prompt_from_components(components, mode=DEFAULT_MODE):
+    """Build a validated prompt for either generation mode."""
+    normalized_mode = normalize_mode(mode)
 
-    Struktur:
-    1. Identität erhalten
-    2. Hauptszene / Körper / Aktion
-    3. Gesicht / Blick / Ausdruck
-    4. Kleidung
-    5. Umgebung / Kamera / Licht / Wirkung
-    6. Banner-Freiraum, falls Banner aktiv
-    7. Prioritäten am Ende wiederholen
-    8. Schutzregeln / negative Constraints
-    """
-    brand_tone = components.get("brandTone", "")
+    person_concept = components.get("personConcept", "")
     work_context = components.get("workContext", "")
+    image_effect = components.get("imageEffect", "")
+
+    # The legacy field is kept for the unchanged Image-to-Image UI.
+    if normalized_mode == "image_to_image" and not work_context:
+        work_context = components.get("brandTone", "")
+
     action = components.get("action", "")
     expression = components.get("expression", "")
     outfit = components.get("outfit", "")
@@ -256,8 +296,9 @@ def build_prompt_from_components(components):
     banner = components.get("banner", {})
 
     selected_anything = any([
-        brand_tone,
+        person_concept,
         work_context,
+        image_effect,
         action,
         expression,
         outfit,
@@ -275,75 +316,59 @@ def build_prompt_from_components(components):
 
     blocks = []
 
-    blocks.append(
-        "Preserve the person's identity, face structure, age, hairstyle, "
-        "skin tone, natural body proportions, and recognizable appearance."
-    )
+    if normalized_mode == "text_to_image":
+        blocks.append(
+            "Create a completely fictional, photorealistic professional "
+            "employer-branding campaign image. Every depicted person is a "
+            "synthetic character and must not imitate or depict a real "
+            "identifiable individual."
+        )
+    else:
+        blocks.append(
+            "Preserve the uploaded person's identity, face structure, age, "
+            "hairstyle, skin tone, natural body proportions, and recognizable "
+            "appearance."
+        )
 
-    main_scene_parts = []
-
-    if pose:
-        main_scene_parts.append(pose)
-
-    if action:
-        main_scene_parts.append(action)
+    if person_concept:
+        blocks.append("Main subject: " + person_concept)
 
     if work_context:
-        main_scene_parts.append(work_context)
+        blocks.append("Work setting and activity: " + work_context)
 
-    if main_scene_parts:
-        blocks.append(
-            "Create a realistic professional employer-branding photo where "
-            "the person is " + ", ".join(main_scene_parts) + "."
-        )
+    if action:
+        blocks.append("Collaboration and action: " + action)
 
-    if brand_tone:
-        blocks.append(
-            "Employer-brand image effect: " + brand_tone
-        )
+    if pose:
+        blocks.append("Body position: the main person is " + pose + ".")
 
     face_parts = []
 
     if expression:
-        face_parts.append(
-            f"the person has a {expression}"
-        )
+        face_parts.append("has " + expression)
 
     if gaze:
-        face_parts.append(
-            f"the person is {gaze}"
-        )
+        face_parts.append("is " + gaze)
 
     if face_parts:
-        face_block = (
-            "Face and gaze: " +
-            "; ".join(face_parts) +
-            "."
-        )
+        face_block = "Face and gaze: the main person " + "; ".join(face_parts) + "."
 
         if gaze:
             face_block += (
-                " The head direction and both eyes must clearly follow "
-                "this gaze instruction."
+                " The head direction and both eyes must clearly follow this "
+                "gaze instruction."
             )
 
         blocks.append(face_block)
 
     if outfit:
-        blocks.append(
-            f"Clothing: the person is {outfit}."
-        )
+        blocks.append("Clothing: the main person is " + outfit + ".")
 
-    visual_style_parts = []
-
-    if framing:
-        visual_style_parts.append(framing)
-
-    if camera_angle:
-        visual_style_parts.append(camera_angle)
-
-    if lighting:
-        visual_style_parts.append(lighting)
+    visual_style_parts = [
+        part
+        for part in (framing, camera_angle, lighting, image_effect)
+        if part
+    ]
 
     if visual_style_parts:
         blocks.append(
@@ -361,17 +386,20 @@ def build_prompt_from_components(components):
         if banner_position == "right":
             blocks.append(
                 "Leave clean negative space on the right side of the image, "
-                "with calm background space and no generated words, letters, logos, signs, labels, or typography."
+                "with a calm background and no generated words, letters, "
+                "logos, signs, labels, or typography."
             )
         elif banner_position == "top":
             blocks.append(
-                "Leave clean negative space at the top of the image, "
-                "with calm background space and no generated words, letters, logos, signs, labels, or typography."
+                "Leave clean negative space at the top of the image, with a "
+                "calm background and no generated words, letters, logos, "
+                "signs, labels, or typography."
             )
         else:
             blocks.append(
-                "Leave clean negative space at the bottom of the image, "
-                "with calm background space and no generated words, letters, logos, signs, labels, or typography."
+                "Leave clean negative space at the bottom of the image, with "
+                "a calm background and no generated words, letters, logos, "
+                "signs, labels, or typography."
             )
 
     if extra_prompt:
@@ -382,34 +410,23 @@ def build_prompt_from_components(components):
 
         blocks.append(normalized_extra)
 
-    priority_details = []
-
-    if gaze:
-        priority_details.append(gaze)
-
-    if expression:
-        priority_details.append(expression)
-
-    if action:
-        priority_details.append(action)
-
-    if pose:
-        priority_details.append(pose)
-
-    if work_context:
-        priority_details.append(work_context)
-
-    if outfit:
-        priority_details.append(outfit)
-
-    if camera_angle:
-        priority_details.append(camera_angle)
-
-    if framing:
-        priority_details.append(framing)
-
-    if lighting:
-        priority_details.append(lighting)
+    priority_details = [
+        part
+        for part in (
+            person_concept,
+            work_context,
+            action,
+            pose,
+            gaze,
+            expression,
+            outfit,
+            camera_angle,
+            framing,
+            lighting,
+            image_effect
+        )
+        if part
+    ]
 
     if banner.get("enabled"):
         priority_details.append(
@@ -423,11 +440,15 @@ def build_prompt_from_components(components):
             "."
         )
 
-    blocks.append(
-        ""
-    )
+    if normalized_mode == "text_to_image":
+        blocks.append(
+            "Do not generate company logos, readable brand names, employee "
+            "identification cards, or claims that the fictional people are "
+            "real employees. Avoid degrading, discriminatory, or stereotypical "
+            "depictions."
+        )
 
-    return "\n\n".join(block for block in blocks if block).strip()
+    return "\n\n".join(blocks).strip()
 
 
 # ---------------------------------------------------------------------------
@@ -978,6 +999,49 @@ def save_generated_image(image_bytes):
 # ComfyUI
 # ---------------------------------------------------------------------------
 
+def validate_uploaded_image(file_bytes, filename):
+    max_bytes = int(MODEL_CONFIG.get("max_upload_bytes", 15_000_000))
+    max_pixels = int(MODEL_CONFIG.get("max_upload_pixels", 30_000_000))
+
+    if not file_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded file is empty"
+        )
+
+    if len(file_bytes) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail="The uploaded image exceeds the configured size limit."
+        )
+
+    try:
+        with Image.open(BytesIO(file_bytes)) as image:
+            image_format = str(image.format or "").upper()
+            width, height = image.size
+            image.verify()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded file is not a valid image."
+        ) from exc
+
+    if image_format not in {"JPEG", "PNG", "WEBP"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Only JPEG, PNG, and WebP images are supported."
+        )
+
+    if width <= 0 or height <= 0 or width * height > max_pixels:
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded image dimensions are not supported."
+        )
+
+    safe_name = Path(filename or "input.png").name
+
+    return safe_name or "input.png"
+
 def comfy_upload_image(file_bytes, filename):
     files = {
         "image": (filename, file_bytes)
@@ -1037,13 +1101,85 @@ def wait_for_result(prompt_id):
         time.sleep(0.4)
 
 
-def patch_workflow(workflow, image_name, prompt):
+def patch_text_to_image_workflow(workflow, prompt, components, mode_config):
+    nodes = mode_config["nodes"]
+    model = mode_config["model"]
+    generation = mode_config["generation"]
+
+    model_loader = workflow[nodes["model_loader"]]["inputs"]
+    clip_loader = workflow[nodes["clip_loader"]]["inputs"]
+    vae_loader = workflow[nodes["vae_loader"]]["inputs"]
+    positive = workflow[nodes["positive_prompt"]]["inputs"]
+    latent = workflow[nodes["latent_image"]]["inputs"]
+    sampler = workflow[nodes["sampler"]]["inputs"]
+
+    model_loader["unet_name"] = model["unet_name"]
+    clip_loader["clip_name"] = model["clip_name"]
+    vae_loader["vae_name"] = model["vae_name"]
+    positive["text"] = prompt
+
+    aspect_ratio = components.get(
+        "aspectRatio",
+        generation.get("default_aspect_ratio", "1:1")
+    )
+    dimensions = generation["aspect_ratios"].get(aspect_ratio)
+
+    if not dimensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported aspect ratio: {aspect_ratio}"
+        )
+
+    latent["width"] = int(dimensions[0])
+    latent["height"] = int(dimensions[1])
+    sampler["seed"] = uuid.uuid4().int % 1_000_000_000_000_000
+    sampler["steps"] = int(generation.get("steps", 50))
+    sampler["cfg"] = float(generation.get("cfg", 4.0))
+    sampler["sampler_name"] = generation.get("sampler_name", "euler")
+    sampler["scheduler"] = generation.get("scheduler", "simple")
+
+    return workflow
+
+
+def patch_image_to_image_workflow(workflow, image_name, prompt):
     workflow["78"]["inputs"]["image"] = image_name
     workflow["435"]["inputs"]["value"] = prompt
     workflow["433:111"]["inputs"]["prompt"] = ["435", 0]
-    workflow["433:3"]["inputs"]["seed"] = uuid.uuid4().int % 1_000_000_000_000_000
+    workflow["433:3"]["inputs"]["seed"] = (
+        uuid.uuid4().int % 1_000_000_000_000_000
+    )
 
     return workflow
+
+
+def patch_workflow(
+    workflow,
+    mode,
+    prompt,
+    components,
+    image_name=None
+):
+    normalized_mode = normalize_mode(mode)
+
+    if normalized_mode == "text_to_image":
+        return patch_text_to_image_workflow(
+            workflow,
+            prompt,
+            components,
+            get_mode_config(normalized_mode)
+        )
+
+    if not image_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Image-to-Image mode requires an uploaded image."
+        )
+
+    return patch_image_to_image_workflow(
+        workflow,
+        image_name,
+        prompt
+    )
 
 
 def track_progress(prompt_id):
@@ -1097,12 +1233,32 @@ def root():
     )
 
 
-@app.get("/api/ui-fields")
-def ui_fields():
-    fields = load_ui_fields()
+@app.get("/api/config")
+def public_config():
+    modes = []
 
-    print("UI_FIELDS_PATH:", UI_FIELDS_PATH.resolve())
-    print("GELADENE FELDER:", [field.get("id") for field in fields])
+    for mode_name, mode_config in MODE_CONFIGS.items():
+        modes.append({
+            "id": mode_name,
+            "label": mode_config.get("label", mode_name),
+            "description": mode_config.get("description", ""),
+            "experimental": bool(mode_config.get("experimental", False)),
+            "requires_upload": bool(mode_config.get("requires_upload", False))
+        })
+
+    return JSONResponse(
+        content={
+            "default_mode": DEFAULT_MODE,
+            "modes": modes
+        },
+        headers=no_cache_headers()
+    )
+
+
+@app.get("/api/ui-fields")
+def ui_fields(mode: str = Query(DEFAULT_MODE)):
+    normalized_mode = normalize_mode(mode)
+    fields = load_ui_fields(normalized_mode)
 
     return JSONResponse(
         content=fields,
@@ -1120,13 +1276,15 @@ def progress():
 
 @app.post("/api/preview-prompt")
 async def preview_prompt(payload: dict = Body(...)):
+    mode = normalize_mode(payload.get("mode", DEFAULT_MODE))
     raw_components = payload.get("components", payload)
 
-    components = normalize_prompt_components(raw_components)
-    prompt = build_prompt_from_components(components)
+    components = normalize_prompt_components(raw_components, mode)
+    prompt = build_prompt_from_components(components, mode)
 
     return JSONResponse(
         content={
+            "mode": mode,
             "prompt": prompt,
             "components": components
         },
@@ -1137,8 +1295,13 @@ async def preview_prompt(payload: dict = Body(...)):
 @app.post("/api/run")
 async def run(
     prompt_components: str = Form(...),
-    file: UploadFile = File(...)
+    mode: str = Form(DEFAULT_MODE),
+    consent_confirmed: bool = Form(False),
+    file: Optional[UploadFile] = File(None)
 ):
+    normalized_mode = normalize_mode(mode)
+    mode_config = get_mode_config(normalized_mode)
+
     try:
         raw_components = json.loads(prompt_components)
     except json.JSONDecodeError as exc:
@@ -1147,8 +1310,14 @@ async def run(
             detail=f"prompt_components is not valid JSON: {exc}"
         )
 
-    components = normalize_prompt_components(raw_components)
-    final_prompt = build_prompt_from_components(components)
+    components = normalize_prompt_components(
+        raw_components,
+        normalized_mode
+    )
+    final_prompt = build_prompt_from_components(
+        components,
+        normalized_mode
+    )
 
     if not final_prompt:
         raise HTTPException(
@@ -1156,38 +1325,52 @@ async def run(
             detail="Prompt is empty"
         )
 
-    print("\n" + "=" * 100)
-    print("PROMPT-KOMPONENTEN VOM FRONTEND:")
-    print(json.dumps(components, indent=2, ensure_ascii=False))
-    print()
-    print("FINALER SERVER-PROMPT:")
-    print(final_prompt)
-    print("=" * 100 + "\n")
+    if DEBUG_PROMPTS:
+        print("\n" + "=" * 100)
+        print("GENERATION MODE:", normalized_mode)
+        print("PROMPT COMPONENTS:")
+        print(json.dumps(components, indent=2, ensure_ascii=False))
+        print("FINAL SERVER PROMPT:")
+        print(final_prompt)
+        print("=" * 100 + "\n")
 
-    image_bytes = await file.read()
+    stored_image_name = None
 
-    if not image_bytes:
-        raise HTTPException(
-            status_code=400,
-            detail="Uploaded file is empty"
+    if mode_config.get("requires_upload"):
+        if not consent_confirmed:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Image-to-Image mode requires confirmation that the "
+                    "image may be processed and altered."
+                )
+            )
+
+        if file is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Image-to-Image mode requires an uploaded image."
+            )
+
+        image_bytes = await file.read()
+        safe_filename = validate_uploaded_image(
+            image_bytes,
+            file.filename
+        )
+        stored_image_name = comfy_upload_image(
+            image_bytes,
+            safe_filename
         )
 
-    stored_image_name = comfy_upload_image(
-        image_bytes,
-        file.filename
-    )
-
-    workflow = deep_copy_workflow()
+    workflow = deep_copy_workflow(normalized_mode)
 
     workflow = patch_workflow(
-        workflow,
-        stored_image_name,
-        final_prompt
+        workflow=workflow,
+        mode=normalized_mode,
+        prompt=final_prompt,
+        components=components,
+        image_name=stored_image_name
     )
-
-    print("PROMPT IN WORKFLOW NODE 435:")
-    print(workflow["435"]["inputs"]["value"])
-    print()
 
     progress_state["value"] = 0
 
@@ -1239,6 +1422,7 @@ async def run(
 
     return JSONResponse(
         content={
+            "mode": normalized_mode,
             "prompt_id": prompt_id,
             "submitted_prompt": final_prompt,
             "prompt_components": components,

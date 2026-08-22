@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <title>AI Image Edit</title>
+  <title>Employer Branding Image Studio</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
@@ -11,21 +11,40 @@
 
   <div class="topbar">
     <div>
-      <h2>AI Image Edit</h2>
+      <h2>Employer Branding Image Studio</h2>
       <div class="subtitle">
-        Lokale ComfyUI-Bildbearbeitung mit serverseitiger Prompt-Erzeugung und Kampagnen-Banner
+        Lokale KI-Bildgenerierung mit standardisierter Prompt-Erzeugung und menschlicher Freigabe
       </div>
     </div>
 
-    <div class="badge">UI-Version: Server-Prompt-Banner-v1</div>
+    <div class="badge">Text-to-Image standardmäßig</div>
   </div>
 
   <div class="stack">
 
-    <div class="card">
+    <div class="card mode-card">
+      <div class="section-heading">
+        <div>
+          <h3>Generierungsmodus</h3>
+          <p id="modeDescription" class="mode-description"></p>
+        </div>
+      </div>
+
+      <div id="modePicker" class="mode-picker"></div>
+    </div>
+
+    <div id="textToImageNotice" class="card notice-card">
+      <strong>Datenschutzärmerer Standardmodus</strong>
+      <span>
+        Die dargestellten Personen werden vollständig synthetisch erzeugt.
+        Es wird kein reales Personenfoto hochgeladen oder bearbeitet.
+      </span>
+    </div>
+
+    <div id="uploadCard" class="card" hidden>
       <div id="drop" class="drop">
         <div id="dropPlaceholder" class="drop-placeholder">
-          Bild hier hineinziehen oder klicken
+          Berechtigtes Referenzbild hier hineinziehen oder klicken
         </div>
 
         <img
@@ -38,7 +57,7 @@
       <input
         id="filePicker"
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg,image/webp"
         style="display:none;"
       >
     </div>
@@ -184,7 +203,7 @@
         ></pre>
       </div>
 
-      <div class="field" style="margin-top: 18px;">
+      <div id="consentSection" class="field consent-panel" hidden>
         <label style="display:flex; gap:10px; align-items:flex-start;">
           <input id="consentAccepted" type="checkbox" style="margin-top:4px;">
 
@@ -198,7 +217,7 @@
             Die erzeugten Bilder sind nicht automatisch zur Veröffentlichung geeignet
             und müssen vor jeder Nutzung geprüft und freigegeben werden.
             <br><br>
-            Die Anwendung darf nicht für rechtswidrige, pornografische,
+            Die experimentelle Funktion darf nicht für rechtswidrige, pornografische,
             diskriminierende, täuschende, beleidigende oder rufschädigende Inhalte
             verwendet werden. Die Nutzung orientiert sich außerdem an den
             Nutzungsregeln des eingesetzten Qwen-Edit-Modells, die bestimmte
@@ -209,7 +228,7 @@
 
       <div class="actions">
         <button id="run" type="button">
-          Start
+          Bild generieren
         </button>
       </div>
 
@@ -230,6 +249,11 @@
   </div>
 
   <script>
+    const modePicker = document.getElementById("modePicker");
+    const modeDescription = document.getElementById("modeDescription");
+    const textToImageNotice = document.getElementById("textToImageNotice");
+    const uploadCard = document.getElementById("uploadCard");
+    const consentSection = document.getElementById("consentSection");
     const drop = document.getElementById("drop");
     const dropPlaceholder = document.getElementById("dropPlaceholder");
     const inputPreview = document.getElementById("inputPreview");
@@ -259,6 +283,8 @@
     let progressTimer = null;
     let previewTimer = null;
     let lastServerPrompt = "";
+    let currentMode = "text_to_image";
+    let availableModes = [];
 
 
     // ------------------------------------------------------------
@@ -326,6 +352,111 @@
       } catch {
         return text;
       }
+    }
+
+
+    function resetSelectedFile() {
+      selectedFile = null;
+      filePicker.value = "";
+
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+      }
+
+      inputPreview.removeAttribute("src");
+      inputPreview.style.display = "none";
+      dropPlaceholder.style.display = "block";
+      consentAccepted.checked = false;
+    }
+
+
+    function renderModeButtons() {
+      modePicker.replaceChildren();
+
+      for (const mode of availableModes) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "mode-option";
+        button.dataset.mode = mode.id;
+
+        const label = document.createElement("strong");
+        label.textContent = mode.label;
+
+        const state = document.createElement("span");
+        state.textContent = mode.experimental
+          ? "Experimentell"
+          : "Standard";
+
+        button.append(label, state);
+        button.addEventListener("click", () => selectMode(mode.id));
+        modePicker.appendChild(button);
+      }
+    }
+
+
+    async function selectMode(modeId) {
+      const mode = availableModes.find(item => item.id === modeId);
+
+      if (!mode) {
+        throw new Error(`Unbekannter Modus: ${modeId}`);
+      }
+
+      currentMode = mode.id;
+      modeDescription.textContent = mode.description || "";
+
+      const requiresUpload = Boolean(mode.requires_upload);
+
+      uploadCard.hidden = !requiresUpload;
+      consentSection.hidden = !requiresUpload;
+      textToImageNotice.hidden = requiresUpload;
+      runButton.textContent = requiresUpload
+        ? "Bild experimentell bearbeiten"
+        : "Bild generieren";
+
+      if (!requiresUpload) {
+        resetSelectedFile();
+      }
+
+      for (const button of modePicker.querySelectorAll(".mode-option")) {
+        button.classList.toggle(
+          "active",
+          button.dataset.mode === currentMode
+        );
+      }
+
+      gallery.replaceChildren();
+      finalPrompt.value = "";
+      promptDebug.textContent = "";
+      setProgress(0);
+
+      await loadUiFields();
+    }
+
+
+    async function loadApplicationConfig() {
+      setStatus("Konfiguration wird geladen ...");
+
+      const response = await fetch(
+        `/api/config?t=${Date.now()}`,
+        {
+          method: "GET",
+          cache: "no-store"
+        }
+      );
+      const data = await readResponseData(response);
+
+      if (!response.ok) {
+        throw new Error(formatServerError(data, response.status));
+      }
+
+      if (!Array.isArray(data?.modes) || !data.modes.length) {
+        throw new Error("Die Serverkonfiguration enthält keine Modi.");
+      }
+
+      availableModes = data.modes;
+      renderModeButtons();
+      await selectMode(data.default_mode || availableModes[0].id);
     }
 
 
@@ -450,6 +581,7 @@
             },
             cache: "no-store",
             body: JSON.stringify({
+              mode: currentMode,
               components
             })
           }
@@ -533,7 +665,7 @@
 
       try {
         const response = await fetch(
-          `/api/ui-fields?t=${Date.now()}`,
+          `/api/ui-fields?mode=${encodeURIComponent(currentMode)}&t=${Date.now()}`,
           {
             method: "GET",
             cache: "no-store"
@@ -789,12 +921,15 @@
     // ------------------------------------------------------------
 
     runButton.addEventListener("click", async () => {
-      if (!selectedFile) {
+      const mode = availableModes.find(item => item.id === currentMode);
+      const requiresUpload = Boolean(mode?.requires_upload);
+
+      if (requiresUpload && !selectedFile) {
         alert("Bitte zuerst ein Bild auswählen.");
         return;
       }
 
-      if (!consentAccepted.checked) {
+      if (requiresUpload && !consentAccepted.checked) {
         alert(
           "Bitte bestätige zuerst die Einwilligung und die Nutzungsbedingungen für die Bildverarbeitung."
         );
@@ -840,15 +975,28 @@
 
       gallery.replaceChildren();
       setProgress(0);
-      setStatus("Upload läuft ...");
+      setStatus(
+        requiresUpload
+          ? "Upload und Bearbeitung werden vorbereitet ..."
+          : "Generierung wird vorbereitet ..."
+      );
 
       const formData = new FormData();
 
-      formData.append(
-        "file",
-        selectedFile,
-        selectedFile.name
-      );
+      formData.append("mode", currentMode);
+
+      if (requiresUpload && selectedFile) {
+        formData.append(
+          "consent_confirmed",
+          String(consentAccepted.checked)
+        );
+
+        formData.append(
+          "file",
+          selectedFile,
+          selectedFile.name
+        );
+      }
 
       formData.append(
         "prompt_components",
@@ -953,7 +1101,12 @@
     // ------------------------------------------------------------
 
     updateBannerVisibility();
-    loadUiFields();
+
+    loadApplicationConfig().catch(error => {
+      console.error("Initialisierungsfehler:", error);
+      setStatus(`Initialisierungsfehler: ${error.message}`);
+      runButton.disabled = true;
+    });
   </script>
 
 </body>

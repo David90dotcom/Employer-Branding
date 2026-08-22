@@ -1,0 +1,50 @@
+{
+  "default_mode": "text_to_image",
+  "max_upload_bytes": 15000000,
+  "max_upload_pixels": 30000000,
+  "modes": {
+    "text_to_image": {
+      "label": "Text-to-Image",
+      "description": "Erzeugt vollständig fiktive Employer-Branding-Motive ohne Personen-Upload.",
+      "experimental": false,
+      "requires_upload": false,
+      "workflow": "workflow_text_to_image.json",
+      "ui_fields": "ui_fields_text_to_image.json",
+      "model": {
+        "unet_name": "qwen_image_2512_fp8_e4m3fn.safetensors",
+        "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        "vae_name": "qwen_image_vae.safetensors"
+      },
+      "generation": {
+        "steps": 50,
+        "cfg": 4.0,
+        "sampler_name": "euler",
+        "scheduler": "simple",
+        "default_aspect_ratio": "1:1",
+        "aspect_ratios": {
+          "1:1": [1328, 1328],
+          "16:9": [1664, 928],
+          "9:16": [928, 1664],
+          "4:3": [1472, 1104],
+          "3:4": [1104, 1472]
+        }
+      },
+      "nodes": {
+        "model_loader": "1",
+        "clip_loader": "2",
+        "vae_loader": "3",
+        "positive_prompt": "4",
+        "latent_image": "7",
+        "sampler": "8"
+      }
+    },
+    "image_to_image": {
+      "label": "Image-to-Image",
+      "description": "Experimentelle Bearbeitung eines berechtigt hochgeladenen Personenbildes.",
+      "experimental": true,
+      "requires_upload": true,
+      "workflow": "workflow_template.json",
+      "ui_fields": "ui_fields.json"
+    }
+  }
+}
