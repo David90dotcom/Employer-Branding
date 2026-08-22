@@ -1,0 +1,369 @@
+[
+  {
+    "id": "optimizationGoal",
+    "label": "Primäres Optimierungsziel",
+    "help": "Pro Durchlauf ein Hauptziel wählen. So bleibt die zweite Prompt-Stufe fokussiert und das Ergebnis besser vergleichbar.",
+    "required": true,
+    "options": [
+      {
+        "label": "Bitte Optimierungsziel auswählen",
+        "value": ""
+      },
+      {
+        "label": "Tätigkeit klarer erkennbar machen",
+        "value": "Make the concrete workplace task immediately clearer and more understandable for the target audience."
+      },
+      {
+        "label": "Praxislernen und Verantwortung stärken",
+        "value": "Strengthen the visual evidence of practical learning, early responsibility, and professional development."
+      },
+      {
+        "label": "Zusammenarbeit oder Anleitung hervorheben",
+        "value": "Make collaboration, mentoring, or team support more credible and central to the campaign message."
+      },
+      {
+        "label": "Authentischer statt gestellt wirken",
+        "value": "Reduce the staged stock-photo impression and make the scene feel more authentic and observational."
+      },
+      {
+        "label": "Zielgruppenansprache verbessern",
+        "value": "Make the scene more relevant and approachable for school graduates and prospective dual-study applicants."
+      },
+      {
+        "label": "Kampagnenkomposition optimieren",
+        "value": "Improve the composition for campaign use by strengthening visual hierarchy and usable negative space."
+      },
+      {
+        "label": "Kontrollierte A/B-Variante erzeugen",
+        "value": "Create a controlled alternative for an A/B comparison while preserving the original campaign message."
+      }
+    ]
+  },
+  {
+    "id": "changeStrength",
+    "label": "Änderungsstärke",
+    "help": "Eine geringe Änderungsstärke reduziert unnötige Abweichungen vom Ausgangsbild.",
+    "options": [
+      {
+        "label": "Gezielt und minimal (empfohlen)",
+        "value": "Apply a targeted minimal edit. Preserve the source image as closely as possible outside the explicitly requested change.",
+        "default": true
+      },
+      {
+        "label": "Klar sichtbar, aber kontrolliert",
+        "value": "Make the requested improvement clearly visible while keeping the main person, campaign message, and unaffected image elements stable."
+      },
+      {
+        "label": "Deutlich alternative Inszenierung",
+        "value": "Create a noticeably different campaign interpretation while preserving the fictional main person's visual identity and the core employer-branding message."
+      }
+    ]
+  },
+  {
+    "id": "preservationFocus",
+    "label": "Was besonders erhalten bleiben soll",
+    "help": "Legt fest, welche Kontinuität beim Übergang von Stufe 1 zu Stufe 2 Vorrang hat.",
+    "options": [
+      {
+        "label": "Person, Grundszene und Kampagnenbotschaft",
+        "value": "Preserve the fictional main person's visual identity, the core workplace context, and the central campaign message.",
+        "default": true
+      },
+      {
+        "label": "Person und Arbeitsumgebung",
+        "value": "Preserve the fictional main person's visual identity and the existing workplace environment; change only the selected activity, interaction, or body language."
+      },
+      {
+        "label": "Person und Tätigkeit",
+        "value": "Preserve the fictional main person's visual identity and the existing workplace activity; change only the selected composition, expression, gaze, or visual effect."
+      },
+      {
+        "label": "Vor allem die fiktive Person",
+        "value": "Preserve the fictional main person's visual identity and natural proportions; the workplace environment may change only where explicitly requested."
+      }
+    ]
+  },
+  {
+    "id": "workActivity",
+    "label": "Tätigkeit / Arbeitssituation",
+    "help": "Nur ändern, wenn die Tätigkeit im Ausgangsbild unklar oder für die Kampagnenaussage ungeeignet ist.",
+    "options": [
+      {
+        "label": "Unverändert lassen",
+        "value": ""
+      },
+      {
+        "label": "Bestehende Tätigkeit deutlicher zeigen",
+        "value": "Keep the existing type of workplace activity, but make the relevant hands, work objects, tools, documents, products, or screens clearer and causally aligned with the task."
+      },
+      {
+        "label": "Filiale: konkrete Aufgabe",
+        "value": "Show a clear food-retail task such as checking a product display, coordinating shelf organization, reviewing availability on a tablet, or briefly discussing the work area."
+      },
+      {
+        "label": "Logistik: Warenfluss prüfen",
+        "value": "Show a clear logistics task involving a handheld scanner, packages, organized storage zones, a delivery list, or coordination of a visible goods-flow process."
+      },
+      {
+        "label": "Verwaltung / Digitalprojekt",
+        "value": "Show a clear administrative or digital project task involving a laptop, simple dashboard, notes, project documents, or a concrete planning and checking process."
+      },
+      {
+        "label": "Duales Studium: Praxislernen",
+        "value": "Show a credible dual-study learning moment in which academic understanding is applied to a visible workplace task and growing responsibility becomes observable."
+      },
+      {
+        "label": "Ergebnis prüfen oder übergeben",
+        "value": "Show the main person checking, explaining, presenting, or handing over a visible work result that is understandable without generated text."
+      }
+    ]
+  },
+  {
+    "id": "interaction",
+    "label": "Personenzahl und Interaktion",
+    "help": "Zusätzliche Personen erhalten eine erkennbare Funktion in derselben Arbeitssituation und dienen nicht als bloße Dekoration.",
+    "options": [
+      {
+        "label": "Unverändert lassen",
+        "value": ""
+      },
+      {
+        "label": "Eine Person bei klarer Tätigkeit",
+        "value": "Keep one fictional main person as the only visible subject, focused on one concrete workplace task."
+      },
+      {
+        "label": "Austausch mit einer Person",
+        "value": "Add or retain one fictional colleague. Both people share attention to the same document, screen, product, tool, package, plan, or work object, while the original fictional main person remains visually primary."
+      },
+      {
+        "label": "Anleitung / Mentoring",
+        "value": "Show a credible learning interaction between the fictional main person and one fictional colleague: one explains or demonstrates a concrete work step while both attend to the same object or process."
+      },
+      {
+        "label": "Kleines Team bei gemeinsamer Aufgabe",
+        "value": "Show a small fictional team of three people collaborating as equals around one clearly visible workplace task. The original fictional main person remains recognizable and visually important."
+      },
+      {
+        "label": "Feedback oder Ergebnisübergabe",
+        "value": "Show the fictional main person and one colleague jointly checking, discussing, or handing over a visible work result. Their gaze and gestures must align naturally with the same result."
+      }
+    ]
+  },
+  {
+    "id": "pose",
+    "label": "Pose / Körperhandlung",
+    "help": "Die Pose sollte die Tätigkeit unterstützen und nicht wie ein losgelöstes Bewerbungsfoto wirken.",
+    "options": [
+      {
+        "label": "Unverändert lassen",
+        "value": ""
+      },
+      {
+        "label": "Aktiv bei der Tätigkeit",
+        "value": "Place the main person in an active, anatomically plausible body position directly connected to the selected workplace task."
+      },
+      {
+        "label": "Natürlich stehend",
+        "value": "Show the main person standing naturally with balanced weight, relaxed shoulders, and hands meaningfully connected to the work situation."
+      },
+      {
+        "label": "Sitzend am Arbeitsplatz",
+        "value": "Show the main person sitting upright at a workstation with natural posture and hands positioned plausibly near the visible task."
+      },
+      {
+        "label": "In Bewegung",
+        "value": "Show the main person walking or moving naturally through the workplace while remaining clearly connected to the depicted activity."
+      },
+      {
+        "label": "Zeigend oder erklärend",
+        "value": "Show the main person using one natural explanatory gesture toward the shared document, screen, product, plan, tool, or work result."
+      }
+    ]
+  },
+  {
+    "id": "gaze",
+    "label": "Blickführung",
+    "help": "Aufgabenbezogene Blickführung wirkt meist authentischer; direkter Kamerablick eignet sich für eine bewusste Ansprache.",
+    "options": [
+      {
+        "label": "Unverändert lassen",
+        "value": ""
+      },
+      {
+        "label": "Blick auf die Tätigkeit",
+        "value": "Direct the main person's gaze naturally toward the document, screen, product, tool, package, plan, or work object used in the task."
+      },
+      {
+        "label": "Blick zur anderen Person",
+        "value": "Direct the main person's gaze naturally toward the colleague involved in the same task or conversation."
+      },
+      {
+        "label": "Blick in die Kamera",
+        "value": "Use natural direct eye contact with the camera while keeping the workplace activity credible and visible."
+      },
+      {
+        "label": "Leicht seitlicher Blick",
+        "value": "Use a natural slightly off-camera gaze with a relaxed head position and clear facial detail."
+      }
+    ]
+  },
+  {
+    "id": "expression",
+    "label": "Gesichtsausdruck / Ausstrahlung",
+    "help": "Glaubwürdige, zurückhaltende Ausdrücke vermeiden übertriebene Werbeästhetik.",
+    "options": [
+      {
+        "label": "Unverändert lassen",
+        "value": ""
+      },
+      {
+        "label": "Konzentriert",
+        "value": "Use a focused expression directed toward the visible task, with relaxed facial muscles and no theatrical intensity."
+      },
+      {
+        "label": "Ruhig selbstsicher",
+        "value": "Use a calm, confident expression with steady eyes, a relaxed mouth, and credible professional presence."
+      },
+      {
+        "label": "Leicht natürlich lächelnd",
+        "value": "Use a slight natural smile with relaxed eyes and cheeks, avoiding exaggerated enthusiasm."
+      },
+      {
+        "label": "Motiviert und aufmerksam",
+        "value": "Use an alert and engaged expression with natural positive energy and credible facial detail."
+      },
+      {
+        "label": "Offen und ansprechbar",
+        "value": "Use an open, approachable expression with authentic warmth and restrained campaign aesthetics."
+      }
+    ]
+  },
+  {
+    "id": "roleStyling",
+    "label": "Kleidung / Rollenwirkung",
+    "help": "Nur anpassen, wenn Kleidung und dargestellte Tätigkeit nicht zusammenpassen.",
+    "options": [
+      {
+        "label": "Unverändert lassen",
+        "value": ""
+      },
+      {
+        "label": "Schlicht professionell",
+        "value": "Use simple, well-fitted professional clothing without logos, slogans, name tags, or recognizable brand colors."
+      },
+      {
+        "label": "Moderner Arbeitslook",
+        "value": "Use a clean modern work look with a plain shirt or overshirt, neat trousers, and practical understated shoes suitable for the visible task."
+      },
+      {
+        "label": "Business casual",
+        "value": "Use restrained business-casual clothing with a plain shirt or blouse, neat trousers, and no visible branding."
+      },
+      {
+        "label": "Praktischer Filial- oder Logistiklook",
+        "value": "Use clean practical work clothing appropriate for food retail or logistics, without company colors, logos, name tags, or readable markings."
+      },
+      {
+        "label": "Tech-casual",
+        "value": "Use a plain sweater, shirt, overshirt, or casual jacket with neat trousers and no visible logos."
+      }
+    ]
+  },
+  {
+    "id": "composition",
+    "label": "Bildausschnitt / Kampagnenkomposition",
+    "help": "Stufe 2 behält das Seitenverhältnis des Ausgangsbildes bei, kann aber Bildhierarchie und Textfläche verbessern.",
+    "options": [
+      {
+        "label": "Unverändert lassen",
+        "value": ""
+      },
+      {
+        "label": "Halbkörper mit sichtbarer Tätigkeit",
+        "value": "Use a medium environmental shot that shows the main person from approximately head to waist together with enough workplace context to understand the task."
+      },
+      {
+        "label": "Dreiviertelkörper mit Arbeitskontext",
+        "value": "Use a three-quarter body composition that keeps the main person recognizable while clearly showing relevant work objects and the surrounding workplace."
+      },
+      {
+        "label": "Weite glaubwürdige Arbeitsszene",
+        "value": "Use a wide documentary composition in which people, workplace, and the concrete task remain immediately understandable."
+      },
+      {
+        "label": "Person links, Textfläche rechts",
+        "value": "Place the main visual activity in the left portion of the existing frame and create calm, clean negative space on the right for separately added campaign copy."
+      },
+      {
+        "label": "Person rechts, Textfläche links",
+        "value": "Place the main visual activity in the right portion of the existing frame and create calm, clean negative space on the left for separately added campaign copy."
+      },
+      {
+        "label": "Zentrierte Social-Media-Komposition",
+        "value": "Use a balanced centered composition with a strong focal point, clear silhouette, and uncluttered background for social-media use within the existing aspect ratio."
+      }
+    ]
+  },
+  {
+    "id": "visualEffect",
+    "label": "Bildwirkung",
+    "help": "Die Bildwirkung sollte zur Zielgruppe und zur Aussage der Kampagnenvariante passen.",
+    "options": [
+      {
+        "label": "Unverändert lassen",
+        "value": ""
+      },
+      {
+        "label": "Authentisch und dokumentarisch",
+        "value": "Use authentic documentary employer-branding photography with natural colors, credible workplace detail, and an observed rather than staged moment."
+      },
+      {
+        "label": "Warm und nahbar",
+        "value": "Use warm, approachable employer-branding photography with natural human interaction, realistic skin tones, and restrained positive energy."
+      },
+      {
+        "label": "Professionell und verlässlich",
+        "value": "Use professional, trustworthy campaign photography with balanced composition, realistic detail, and a calm visual hierarchy."
+      },
+      {
+        "label": "Modern und dynamisch",
+        "value": "Use modern early-career campaign photography with credible movement, clear visual hierarchy, and no exaggerated advertising excitement."
+      },
+      {
+        "label": "Hell und zukunftsorientiert",
+        "value": "Use bright, future-oriented campaign photography with realistic lighting, fresh but restrained colors, and a credible workplace atmosphere."
+      }
+    ]
+  },
+  {
+    "id": "correctionFocus",
+    "label": "Gezielte Qualitätskorrektur",
+    "help": "Dient der Korrektur eines konkreten Bildproblems; nicht mehrere unabhängige Korrekturen gleichzeitig erzwingen.",
+    "options": [
+      {
+        "label": "Keine zusätzliche Korrektur",
+        "value": ""
+      },
+      {
+        "label": "Hände und Arbeitsobjekt plausibilisieren",
+        "value": "Correct hands, fingers, grip, and contact with the work object so that anatomy and task interaction are natural and physically plausible."
+      },
+      {
+        "label": "Hintergrund beruhigen",
+        "value": "Simplify distracting background details while retaining the workplace cues needed to understand the task."
+      },
+      {
+        "label": "Körperproportionen korrigieren",
+        "value": "Correct anatomy, body proportions, posture, and spatial relationships without changing the fictional main person's recognizable visual identity."
+      },
+      {
+        "label": "Licht und Hauttöne natürlicher machen",
+        "value": "Correct lighting, shadows, color balance, and skin tones so that the scene appears natural and photographically coherent."
+      },
+      {
+        "label": "Artefakte und generierte Schrift entfernen",
+        "value": "Remove visual artifacts, pseudo-text, accidental logos, unreadable signs, distorted objects, and other synthetic-looking details without changing the core scene."
+      }
+    ]
+  }
+]

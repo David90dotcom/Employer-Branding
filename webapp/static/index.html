@@ -34,32 +34,11 @@
     </div>
 
     <div id="textToImageNotice" class="card notice-card">
-      <strong>Datenschutzärmerer Standardmodus</strong>
+      <strong>Datenschutzfreundlicher Ausgangspunkt</strong>
       <span>
         Die dargestellten Personen werden vollständig synthetisch erzeugt.
         Es wird kein reales Personenfoto hochgeladen oder bearbeitet.
       </span>
-    </div>
-
-    <div id="uploadCard" class="card" hidden>
-      <div id="drop" class="drop">
-        <div id="dropPlaceholder" class="drop-placeholder">
-          Berechtigtes Referenzbild hier hineinziehen oder klicken
-        </div>
-
-        <img
-          id="inputPreview"
-          style="display:none;"
-          alt="Input Vorschau"
-        >
-      </div>
-
-      <input
-        id="filePicker"
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        style="display:none;"
-      >
     </div>
 
     <div id="chainSourceCard" class="card chain-source-card" hidden>
@@ -71,8 +50,9 @@
         <h3 id="chainSourceTitle">Gespeichertes Kampagnenmotiv</h3>
         <p>
           Dieses synthetische Bild wird als Ausgangspunkt verwendet. Die
-          Bearbeitung soll die fiktive Person wiedererkennbar erhalten und nur
-          die ausgewählten Kampagnendetails verändern.
+          Optimierung erhält die fiktive Person wiedererkennbar, verfolgt ein
+          primäres Kampagnenziel und verändert nur ausdrücklich ausgewählte
+          Merkmale.
         </p>
         <button id="clearChainSource" type="button" class="secondary-button">
           Anderes Bibliotheksbild wählen
@@ -109,7 +89,7 @@
       <div id="mandatoryConstraints" class="constraint-panel">
         <div>
           <strong>Verbindliche Leitplanken</strong>
-          <span>werden immer in Prompt und Negative Prompt übernommen</span>
+          <span>werden in beiden Stufen serverseitig in die Promptstruktur übernommen</span>
         </div>
         <ul>
           <li>keine identifizierbare reale Person oder vorgetäuschte Beschäftigtenaussage</li>
@@ -119,7 +99,7 @@
         </ul>
       </div>
 
-      <div id="experimentSettings" class="experiment-panel">
+      <div id="comparisonSettings" class="comparison-panel">
         <div class="field">
           <label style="display:flex; gap:10px; align-items:center;">
             <input id="fixedSeedEnabled" type="checkbox" checked>
@@ -300,29 +280,6 @@
         </details>
       </div>
 
-      <div id="consentSection" class="field consent-panel" hidden>
-        <label style="display:flex; gap:10px; align-items:flex-start;">
-          <input id="consentAccepted" type="checkbox" style="margin-top:4px;">
-
-          <span>
-            Ich bestätige, dass ich zur Nutzung des hochgeladenen Bildes berechtigt bin
-            und dass die darauf erkennbare Person der Verarbeitung und Veränderung
-            ihres Bildes für diesen Kampagnenentwurf zugestimmt hat.
-            <br><br>
-            Mir ist bewusst, dass es sich bei dieser Anwendung um einen lokalen
-            Prototyp zur Erstellung von Employer-Branding-Entwürfen handelt.
-            Die erzeugten Bilder sind nicht automatisch zur Veröffentlichung geeignet
-            und müssen vor jeder Nutzung geprüft und freigegeben werden.
-            <br><br>
-            Die experimentelle Funktion darf nicht für rechtswidrige, pornografische,
-            diskriminierende, täuschende, beleidigende oder rufschädigende Inhalte
-            verwendet werden. Die Nutzung orientiert sich außerdem an den
-            Nutzungsregeln des eingesetzten Qwen-Edit-Modells, die bestimmte
-            missbräuchliche und unzulässige Inhalte ausschließen.
-          </span>
-        </label>
-      </div>
-
       <div class="actions">
         <button id="run" type="button">
           Bild generieren
@@ -371,16 +328,10 @@
     const modeBadge = document.getElementById("modeBadge");
     const promptLabDescription = document.getElementById("promptLabDescription");
     const textToImageNotice = document.getElementById("textToImageNotice");
-    const uploadCard = document.getElementById("uploadCard");
     const chainSourceCard = document.getElementById("chainSourceCard");
     const chainSourceImage = document.getElementById("chainSourceImage");
     const chainSourceTitle = document.getElementById("chainSourceTitle");
     const clearChainSource = document.getElementById("clearChainSource");
-    const consentSection = document.getElementById("consentSection");
-    const drop = document.getElementById("drop");
-    const dropPlaceholder = document.getElementById("dropPlaceholder");
-    const inputPreview = document.getElementById("inputPreview");
-    const filePicker = document.getElementById("filePicker");
     const fieldsGrid = document.getElementById("fieldsGrid");
     const extraPrompt = document.getElementById("extraPrompt");
     const finalPrompt = document.getElementById("finalPrompt");
@@ -391,14 +342,13 @@
     const promptSections = document.getElementById("promptSections");
     const successCriteria = document.getElementById("successCriteria");
     const successPanel = document.getElementById("successPanel");
-    const experimentSettings = document.getElementById("experimentSettings");
+    const comparisonSettings = document.getElementById("comparisonSettings");
     const mandatoryConstraints = document.getElementById("mandatoryConstraints");
     const fixedSeedEnabled = document.getElementById("fixedSeedEnabled");
     const fixedSeed = document.getElementById("fixedSeed");
     const seedSummary = document.getElementById("seedSummary");
     const promptDebug = document.getElementById("promptDebug");
     const runButton = document.getElementById("run");
-    const consentAccepted = document.getElementById("consentAccepted");
     const bar = document.getElementById("bar");
     const statusEl = document.getElementById("status");
     const gallery = document.getElementById("gallery");
@@ -416,8 +366,6 @@
     const bannerAlign = document.getElementById("bannerAlign");
     const bannerColor = document.getElementById("bannerColor");
 
-    let selectedFile = null;
-    let previewUrl = null;
     let progressTimer = null;
     let previewTimer = null;
     let lastServerPrompt = "";
@@ -496,22 +444,6 @@
     }
 
 
-    function resetSelectedFile() {
-      selectedFile = null;
-      filePicker.value = "";
-
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-        previewUrl = null;
-      }
-
-      inputPreview.removeAttribute("src");
-      inputPreview.style.display = "none";
-      dropPlaceholder.style.display = "block";
-      consentAccepted.checked = false;
-    }
-
-
     function renderModeButtons() {
       modePicker.replaceChildren();
 
@@ -525,11 +457,9 @@
         label.textContent = mode.label;
 
         const state = document.createElement("span");
-        state.textContent = mode.experimental
-          ? "Experimentell"
-          : mode.requires_library_source
-            ? "Stufe 2"
-            : "Standard";
+        state.textContent = mode.requires_library_source
+          ? "Stufe 2"
+          : "Stufe 1";
 
         button.append(label, state);
         button.addEventListener("click", () => selectMode(mode.id));
@@ -564,17 +494,14 @@
       currentMode = mode.id;
       modeDescription.textContent = mode.description || "";
 
-      const requiresUpload = Boolean(mode.requires_upload);
       const requiresLibrarySource = Boolean(mode.requires_library_source);
       const isTextToImage = mode.id === "text_to_image";
 
-      uploadCard.hidden = !requiresUpload;
-      consentSection.hidden = !requiresUpload;
       textToImageNotice.hidden = !isTextToImage;
-      experimentSettings.hidden = !isTextToImage;
-      mandatoryConstraints.hidden = !isTextToImage;
-      promptSections.hidden = !isTextToImage;
-      successPanel.hidden = !isTextToImage;
+      comparisonSettings.hidden = false;
+      mandatoryConstraints.hidden = false;
+      promptSections.hidden = false;
+      successPanel.hidden = false;
       negativePromptField.hidden = !isTextToImage;
 
       if (isTextToImage) {
@@ -589,44 +516,26 @@
           "Ein positiver Gesamtprompt mit klaren Abschnitten plus separater " +
           "Negative Prompt – kein Bündel unverbundener Einzelprompts."
         );
-      } else if (requiresLibrarySource) {
+      } else {
         modeBadge.textContent = "Multimodales Prompt Chaining · Stufe 2";
         promptLabDescription.textContent = (
-          "Die zweite Prompt-Stufe verbindet das bewusst gespeicherte " +
-          "synthetische Ausgangsbild mit einem gezielten Änderungsauftrag."
+          "Die zweite Stufe setzt ein primäres Optimierungsziel, übernimmt " +
+          "das gespeicherte synthetische Ausgangsbild und verändert nur " +
+          "ausdrücklich ausgewählte Kampagnenmerkmale."
         );
-        frameworkTitle.textContent = "Bearbeitungsprompt · Stufe 2";
+        frameworkTitle.textContent = "Strukturierter Optimierungsprompt · Stufe 2";
         frameworkDescription.textContent = (
-          "Der zweite Prompt übernimmt das gespeicherte synthetische Bild und " +
-          "beschreibt gezielt, was erhalten und was verändert werden soll."
-        );
-      } else {
-        modeBadge.textContent = "Experimentelles Image-to-Image";
-        promptLabDescription.textContent = (
-          "Die Auswahlfelder beschreiben die Bearbeitung eines berechtigt " +
-          "hochgeladenen realen Bildes."
-        );
-        frameworkTitle.textContent = "Experimenteller Bearbeitungsprompt";
-        frameworkDescription.textContent = (
-          "Dieser Prompt steuert die Bearbeitung eines berechtigt " +
-          "hochgeladenen realen Bildes."
+          "Root Task, Quellenkontinuität, gewünschte Änderungen, Constraints " +
+          "und Definition of Done bilden einen prüfbaren zweiten Prompt."
         );
       }
 
-      if (requiresLibrarySource) {
-        runButton.textContent = "Gespeichertes Bild weiterbearbeiten";
-      } else if (requiresUpload) {
-        runButton.textContent = "Eigenes Bild experimentell bearbeiten";
-      } else {
-        runButton.textContent = "Bild generieren";
-      }
+      runButton.textContent = requiresLibrarySource
+        ? "Kampagnenmotiv gezielt optimieren"
+        : "Bild generieren";
 
       runButton.disabled = requiresLibrarySource && !selectedLibrarySource;
       updateChainSourceCard();
-
-      if (!requiresUpload) {
-        resetSelectedFile();
-      }
 
       for (const button of modePicker.querySelectorAll(".mode-option")) {
         button.classList.toggle(
@@ -801,10 +710,8 @@
         const meta = document.createElement("span");
         meta.className = "library-meta";
         const modeLabel = item.mode === "prompt_chain"
-          ? "Prompt Chain"
-          : item.mode === "image_to_image"
-            ? "Eigenes Bild bearbeitet"
-            : "Text-to-Image";
+          ? "Prompt Chain · Optimierung"
+          : "Text-to-Image";
         meta.textContent = [
           modeLabel,
           formatSavedDate(item.saved_at),
@@ -995,26 +902,14 @@
       const actions = document.createElement("div");
       actions.className = "item-actions result-actions";
 
-      const saveable = [
-        "text_to_image",
-        "prompt_chain"
-      ].includes(result.mode);
-
-      if (saveable) {
-        const saveButton = makeSmallButton(
-          "In Bibliothek speichern",
-          "primary-small-button"
-        );
-        saveButton.addEventListener("click", () => {
-          saveGeneratedResult(result, saveButton);
-        });
-        actions.appendChild(saveButton);
-      } else {
-        resultState.textContent = (
-          "Temporär · Ergebnisse mit realem Ausgangsbild werden nicht " +
-          "in der synthetischen Kampagnenbibliothek gespeichert"
-        );
-      }
+      const saveButton = makeSmallButton(
+        "In Bibliothek speichern",
+        "primary-small-button"
+      );
+      saveButton.addEventListener("click", () => {
+        saveGeneratedResult(result, saveButton);
+      });
+      actions.appendChild(saveButton);
 
       const discardButton = makeSmallButton("Verwerfen", "danger-button");
       discardButton.addEventListener("click", async () => {
@@ -1028,46 +923,6 @@
       actions.appendChild(discardButton);
       item.append(image, resultState, actions);
       gallery.appendChild(item);
-    }
-
-
-    // ------------------------------------------------------------
-    // Bild-Vorschau
-    // ------------------------------------------------------------
-
-    function showInputPreview(file) {
-      if (!file) {
-        return;
-      }
-
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-
-      previewUrl = URL.createObjectURL(file);
-
-      inputPreview.src = previewUrl;
-      inputPreview.style.display = "block";
-      dropPlaceholder.style.display = "none";
-    }
-
-
-    function setFile(file) {
-      if (!file) {
-        return;
-      }
-
-      if (!file.type.startsWith("image/")) {
-        alert("Bitte eine gültige Bilddatei auswählen.");
-        return;
-      }
-
-      selectedFile = file;
-
-      showInputPreview(file);
-
-      gallery.replaceChildren();
-      setStatus(`Ausgewählt: ${file.name}`);
     }
 
 
@@ -1117,11 +972,6 @@
         fixed_seed: Boolean(fixedSeedEnabled.checked),
         seed: Number.parseInt(fixedSeed.value, 10)
       };
-      components.sourceType = (
-        currentMode === "prompt_chain" && selectedLibrarySource
-      )
-        ? "generated_library"
-        : "external_upload";
 
       return components;
     }
@@ -1306,9 +1156,21 @@
             title: "3 · Ausgabeformat",
             description: "Kanalnahes Seitenverhältnis und anschließende Kampagnengestaltung"
           },
-          legacy: {
-            title: "Experimentelle Bildbearbeitung",
-            description: "Einstellungen des unveränderten Image-to-Image-Zusatzmodus"
+          chainGoal: {
+            title: "1 · Root Task und Kontinuität",
+            description: "Ein primäres Optimierungsziel, kontrollierte Änderungsstärke und klare Erhaltungsregeln"
+          },
+          chainScene: {
+            title: "2 · Kampagnenszene optimieren",
+            description: "Tätigkeit, Personenzahl und soziale Interaktion gezielt verbessern"
+          },
+          chainSubject: {
+            title: "3 · Hauptperson glaubwürdig inszenieren",
+            description: "Pose, Blick, Ausdruck und Rollenwirkung passend zur sichtbaren Tätigkeit"
+          },
+          chainComposition: {
+            title: "4 · Komposition und Qualitätskorrektur",
+            description: "Bildhierarchie, Textfläche, Bildwirkung und ein konkretes technisches Problem"
           }
         };
 
@@ -1322,22 +1184,49 @@
         ]);
 
         const outputFields = new Set(["aspectRatio"]);
+        const chainGoalFields = new Set([
+          "optimizationGoal",
+          "changeStrength",
+          "preservationFocus"
+        ]);
+        const chainSceneFields = new Set([
+          "workActivity",
+          "interaction"
+        ]);
+        const chainSubjectFields = new Set([
+          "pose",
+          "gaze",
+          "expression",
+          "roleStyling"
+        ]);
         const sectionContainers = new Map();
 
         function sectionForField(fieldId) {
-          if (currentMode !== "text_to_image") {
-            return "legacy";
+          if (currentMode === "text_to_image") {
+            if (briefingFields.has(fieldId)) {
+              return "briefing";
+            }
+
+            if (outputFields.has(fieldId)) {
+              return "output";
+            }
+
+            return "visual";
           }
 
-          if (briefingFields.has(fieldId)) {
-            return "briefing";
+          if (chainGoalFields.has(fieldId)) {
+            return "chainGoal";
           }
 
-          if (outputFields.has(fieldId)) {
-            return "output";
+          if (chainSceneFields.has(fieldId)) {
+            return "chainScene";
           }
 
-          return "visual";
+          if (chainSubjectFields.has(fieldId)) {
+            return "chainSubject";
+          }
+
+          return "chainComposition";
         }
 
         function getSectionContainer(sectionId) {
@@ -1389,11 +1278,14 @@
 
           const label = document.createElement("label");
           label.htmlFor = field.id;
-          label.textContent = field.label;
+          label.textContent = field.required
+            ? `${field.label} *`
+            : field.label;
 
           const select = document.createElement("select");
           select.id = field.id;
           select.name = field.id;
+          select.required = Boolean(field.required);
 
           for (const optionData of field.options) {
             const option = document.createElement("option");
@@ -1417,6 +1309,13 @@
 
           wrapper.appendChild(label);
           wrapper.appendChild(select);
+
+          if (field.help) {
+            const help = document.createElement("span");
+            help.className = "field-help";
+            help.textContent = String(field.help);
+            wrapper.appendChild(help);
+          }
 
           getSectionContainer(
             sectionForField(field.id)
@@ -1450,47 +1349,6 @@
         );
       }
     }
-
-
-    // ------------------------------------------------------------
-    // Datei-Auswahl
-    // ------------------------------------------------------------
-
-    drop.addEventListener("click", () => {
-      filePicker.click();
-    });
-
-
-    filePicker.addEventListener("change", event => {
-      const file = event.target.files?.[0];
-
-      if (file) {
-        setFile(file);
-      }
-    });
-
-
-    drop.addEventListener("dragover", event => {
-      event.preventDefault();
-      drop.classList.add("dragover");
-    });
-
-
-    drop.addEventListener("dragleave", () => {
-      drop.classList.remove("dragover");
-    });
-
-
-    drop.addEventListener("drop", event => {
-      event.preventDefault();
-      drop.classList.remove("dragover");
-
-      const file = event.dataTransfer.files?.[0];
-
-      if (file) {
-        setFile(file);
-      }
-    });
 
 
     clearChainSource.addEventListener("click", async () => {
@@ -1646,28 +1504,10 @@
 
     runButton.addEventListener("click", async () => {
       const mode = availableModes.find(item => item.id === currentMode);
-      const requiresUpload = Boolean(mode?.requires_upload);
       const requiresLibrarySource = Boolean(mode?.requires_library_source);
 
       if (requiresLibrarySource && !selectedLibrarySource) {
         alert("Bitte zuerst ein Bild aus der Kampagnenbibliothek auswählen.");
-        return;
-      }
-
-      if (requiresUpload && !selectedFile) {
-        alert("Bitte zuerst ein Bild auswählen.");
-        return;
-      }
-
-      if (requiresUpload && !consentAccepted.checked) {
-        alert(
-          "Bitte bestätige zuerst die Einwilligung und die Nutzungsbedingungen für die Bildverarbeitung."
-        );
-
-        setStatus(
-          "Start abgebrochen: Einwilligung/Nutzungshinweis wurde nicht bestätigt."
-        );
-
         return;
       }
 
@@ -1683,6 +1523,14 @@
       const components = preview.components;
       const prompt = preview.prompt;
 
+      if (currentMode === "prompt_chain" && !components.optimizationGoal) {
+        alert(
+          "Bitte für die zweite Prompt-Stufe zuerst ein primäres Optimierungsziel auswählen."
+        );
+        setStatus("Optimierung noch nicht gestartet: Primäres Ziel fehlt.");
+        return;
+      }
+
       if (!prompt) {
         alert(
           "Bitte mindestens eine Auswahl treffen oder einen Freitext-Prompt eingeben."
@@ -1697,10 +1545,8 @@
       setProgress(0);
       setStatus(
         requiresLibrarySource
-          ? "Zweite Stufe der Prompt Chain wird vorbereitet ..."
-          : requiresUpload
-            ? "Upload und experimentelle Bearbeitung werden vorbereitet ..."
-            : "Generierung wird vorbereitet ..."
+          ? "Kontrollierte Kampagnenoptimierung wird vorbereitet ..."
+          : "Generierung wird vorbereitet ..."
       );
 
       const formData = new FormData();
@@ -1711,19 +1557,6 @@
         formData.append(
           "library_source_id",
           selectedLibrarySource.id
-        );
-      }
-
-      if (requiresUpload && selectedFile) {
-        formData.append(
-          "consent_confirmed",
-          String(consentAccepted.checked)
-        );
-
-        formData.append(
-          "file",
-          selectedFile,
-          selectedFile.name
         );
       }
 

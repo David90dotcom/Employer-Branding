@@ -41,8 +41,9 @@ def default_components_for_mode(mode):
 class GenerationModeTests(unittest.TestCase):
     def test_text_to_image_is_default(self):
         self.assertEqual(module.DEFAULT_MODE, "text_to_image")
-        self.assertFalse(
-            module.get_mode_config("text_to_image")["requires_upload"]
+        self.assertEqual(
+            set(module.MODE_CONFIGS),
+            {"text_to_image", "prompt_chain"}
         )
 
     def test_text_to_image_prompt_uses_fictional_people(self):
@@ -120,34 +121,6 @@ class GenerationModeTests(unittest.TestCase):
             package["positive_prompt"]
         )
 
-    def test_image_to_image_workflow_remains_available(self):
-        fields = module.load_ui_fields("image_to_image")
-        raw = {
-            field["id"]: field["options"][1]["value"]
-            for field in fields
-        }
-        raw["banner"] = {"enabled": False}
-
-        components = module.normalize_prompt_components(
-            raw,
-            "image_to_image"
-        )
-        prompt = module.build_prompt_from_components(
-            components,
-            "image_to_image"
-        )
-        workflow = module.patch_workflow(
-            module.deep_copy_workflow("image_to_image"),
-            "image_to_image",
-            prompt,
-            components,
-            "test.png"
-        )
-
-        self.assertIn("Preserve the uploaded person's identity", prompt)
-        self.assertEqual(workflow["78"]["inputs"]["image"], "test.png")
-        self.assertEqual(workflow["435"]["inputs"]["value"], prompt)
-
     def test_prompt_chain_uses_a_saved_synthetic_source(self):
         self.assertTrue(
             module.get_mode_config("prompt_chain")["requires_library_source"]
@@ -163,7 +136,6 @@ class GenerationModeTests(unittest.TestCase):
             "fixed_seed": True,
             "seed": 20260822
         }
-        raw["sourceType"] = "generated_library"
         components = module.normalize_prompt_components(
             raw,
             "prompt_chain"
@@ -180,16 +152,107 @@ class GenerationModeTests(unittest.TestCase):
             "synthetic-source.png"
         )
 
-        self.assertIn("supplied synthetic campaign image", prompt)
-        self.assertNotIn("uploaded person's identity", prompt)
+        self.assertIn("PRIMARY OPTIMIZATION TASK", prompt)
+        self.assertIn("SOURCE AND PRESERVATION", prompt)
+        self.assertIn("REQUESTED VISUAL CHANGES", prompt)
+        self.assertIn("OUTPUT AND DEFINITION OF DONE", prompt)
+        self.assertIn("fully synthetic", prompt)
+        self.assertNotIn("uploaded person's identity", prompt.lower())
         self.assertEqual(
             workflow["78"]["inputs"]["image"],
             "synthetic-source.png"
         )
+        self.assertEqual(workflow["433:3"]["inputs"]["seed"], 20260822)
+        self.assertEqual(workflow["435"]["inputs"]["value"], prompt)
         self.assertEqual(
             module.resolve_mode_model_name("prompt_chain"),
             "qwen_image_edit_2509_fp8_e4m3fn.safetensors"
         )
+
+    def test_prompt_chain_exposes_focus_constraints_and_definition_of_done(self):
+        fields = module.load_ui_fields("prompt_chain")
+        raw = {
+            field["id"]: field["options"][1]["value"]
+            for field in fields
+        }
+        raw["banner"] = {"enabled": False}
+        raw["generation"] = {
+            "fixed_seed": True,
+            "seed": 20260822
+        }
+        components = module.normalize_prompt_components(raw, "prompt_chain")
+        package = module.build_prompt_package(components, "prompt_chain")
+
+        self.assertEqual(
+            [section["title"] for section in package["sections"]],
+            list(module.PROMPT_CHAIN_SECTION_TITLES.values())
+        )
+        self.assertGreaterEqual(len(package["success_criteria"]), 6)
+        self.assertIn("one focused refinement", package["positive_prompt"])
+        self.assertIn(
+            "Change only explicitly requested elements",
+            package["positive_prompt"]
+        )
+        self.assertIn("Definition of done", package["positive_prompt"])
+
+    def test_prompt_chain_fields_cover_campaign_optimization(self):
+        field_ids = {
+            field["id"]
+            for field in module.load_ui_fields("prompt_chain")
+        }
+
+        self.assertEqual(
+            field_ids,
+            {
+                "optimizationGoal",
+                "changeStrength",
+                "preservationFocus",
+                "workActivity",
+                "interaction",
+                "pose",
+                "gaze",
+                "expression",
+                "roleStyling",
+                "composition",
+                "visualEffect",
+                "correctionFocus"
+            }
+        )
+
+    def test_prompt_chain_banner_requests_negative_space(self):
+        fields = module.load_ui_fields("prompt_chain")
+        raw = {
+            field["id"]: field["options"][1]["value"]
+            for field in fields
+        }
+        raw["banner"] = {
+            "enabled": True,
+            "text": "Deine Zukunft beginnt hier",
+            "subtext": "Duales Studium",
+            "position": "right",
+            "style": "dark_glass",
+            "font": "modern",
+            "align": "left",
+            "color": "#1457ff"
+        }
+        raw["generation"] = {
+            "fixed_seed": True,
+            "seed": 20260822
+        }
+        components = module.normalize_prompt_components(raw, "prompt_chain")
+        prompt = module.build_prompt_from_components(components, "prompt_chain")
+
+        self.assertIn("negative space at the right", prompt)
+        self.assertIn("Do not generate the banner text", prompt)
+
+    def test_prompt_chain_requires_a_primary_optimization_goal(self):
+        raw = default_components_for_mode("prompt_chain")
+        components = module.normalize_prompt_components(raw, "prompt_chain")
+        package = module.build_prompt_package(components, "prompt_chain")
+
+        self.assertEqual(package["positive_prompt"], "")
+        self.assertEqual(package["sections"], [])
+        self.assertEqual(package["success_criteria"], [])
 
     def test_prompt_chain_requires_a_saved_library_source(self):
         fields = module.load_ui_fields("prompt_chain")
@@ -204,9 +267,7 @@ class GenerationModeTests(unittest.TestCase):
                 module.run(
                     prompt_components=json.dumps(raw),
                     mode="prompt_chain",
-                    consent_confirmed=False,
-                    library_source_id="",
-                    file=None
+                    library_source_id=""
                 )
             )
 
@@ -305,66 +366,19 @@ class GenerationModeTests(unittest.TestCase):
                 ) = original_paths
                 module.TEMP_RESULTS.clear()
 
-    def test_image_to_image_requires_server_side_consent(self):
-        fields = module.load_ui_fields("image_to_image")
-        raw = {
-            field["id"]: field["options"][1]["value"]
-            for field in fields
-        }
-        raw["banner"] = {"enabled": False}
-
+    def test_removed_image_to_image_mode_is_rejected(self):
         with self.assertRaises(HTTPException) as raised:
-            asyncio.run(
-                module.run(
-                    prompt_components=json.dumps(raw),
-                    mode="image_to_image",
-                    consent_confirmed=False,
-                    library_source_id="",
-                    file=None
-                )
-            )
+            module.normalize_mode("image_to_image")
 
         self.assertEqual(raised.exception.status_code, 400)
-        self.assertIn("requires confirmation", raised.exception.detail)
+        self.assertIn("Unknown generation mode", raised.exception.detail)
 
-    def test_real_upload_result_cannot_enter_synthetic_library(self):
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            original_generated_dir = module.GENERATED_DIR
-            original_temp_results_dir = module.TEMP_RESULTS_DIR
+    def test_real_image_upload_ui_is_removed(self):
+        html = module.INDEX_PATH.read_text(encoding="utf-8")
 
-            try:
-                module.GENERATED_DIR = Path(temporary_directory)
-                module.TEMP_RESULTS_DIR = Path(temporary_directory)
-                module.TEMP_RESULTS.clear()
-
-                image_output = BytesIO()
-                Image.new("RGB", (320, 180), (80, 80, 80)).save(
-                    image_output,
-                    format="PNG"
-                )
-                image_bytes = image_output.getvalue()
-
-                result = module.register_temporary_result(
-                    display_bytes=image_bytes,
-                    source_bytes=image_bytes,
-                    metadata={
-                        "mode": "image_to_image",
-                        "parent_id": None,
-                        "positive_prompt": "Test prompt",
-                        "negative_prompt": "",
-                        "components": {}
-                    }
-                )
-
-                with self.assertRaises(HTTPException) as raised:
-                    module.persist_temporary_result(result["result_id"])
-
-                self.assertEqual(raised.exception.status_code, 400)
-                self.assertIn("fully synthetic", raised.exception.detail)
-            finally:
-                module.GENERATED_DIR = original_generated_dir
-                module.TEMP_RESULTS_DIR = original_temp_results_dir
-                module.TEMP_RESULTS.clear()
+        self.assertNotIn('type="file"', html)
+        self.assertNotIn("consentAccepted", html)
+        self.assertNotIn("Eigenes Bild bearbeiten", html)
 
     def test_expired_temporary_results_are_removed(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

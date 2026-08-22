@@ -144,53 +144,6 @@ h3 {
   line-height: 1.5;
 }
 
-.consent-panel {
-  margin-top: 18px;
-  padding: 16px;
-  border: 1px solid #e5cba5;
-  border-radius: 14px;
-  background: #fff9ef;
-}
-
-.drop {
-  border: 2px dashed #b9c9dc;
-  border-radius: 18px;
-  min-height: 250px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(180deg, #fbfdff 0%, #f4f8fc 100%);
-  cursor: pointer;
-  overflow: hidden;
-  text-align: center;
-  padding: 14px;
-  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
-}
-
-.drop:hover {
-  border-color: #8aa9d3;
-  transform: translateY(-1px);
-}
-
-.drop.dragover {
-  border-color: var(--accent);
-  background: #eef4ff;
-}
-
-.drop img {
-  max-width: 100%;
-  max-height: 360px;
-  object-fit: contain;
-  display: block;
-  border-radius: 12px;
-}
-
-.drop-placeholder {
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.5;
-}
-
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(260px, 1fr));
@@ -318,6 +271,10 @@ input[type="checkbox"] {
   line-height: 1.45;
 }
 
+.field-help {
+  display: block;
+}
+
 .constraint-panel ul,
 .success-panel ul {
   margin: 10px 0 0;
@@ -326,7 +283,7 @@ input[type="checkbox"] {
   line-height: 1.55;
 }
 
-.experiment-panel {
+.comparison-panel {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 220px;
   gap: 18px;
@@ -753,7 +710,7 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
-  .experiment-panel,
+  .comparison-panel,
   .prompt-section,
   .chain-source-card {
     grid-template-columns: 1fr;

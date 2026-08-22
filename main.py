@@ -346,7 +346,7 @@ def start_webapp() -> subprocess.Popen:
 
 def print_configuration() -> None:
     print("=" * 72)
-    print("AI Image Edit Launcher")
+    print("Employer Branding Prompt Lab Launcher")
     print("=" * 72)
     print()
     print("Launcher-Datei:       ", Path(__file__).resolve())

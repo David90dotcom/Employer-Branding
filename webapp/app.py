@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form, Body, Query
+from fastapi import FastAPI, HTTPException, Form, Body, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -14,7 +14,6 @@ import websocket
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import Optional
 from urllib.parse import urlencode
 
 from PIL import Image, ImageDraw, ImageFont
@@ -103,6 +102,15 @@ TEXT_TO_IMAGE_SECTION_TITLES = {
     "constraints": "CONSTRAINTS",
     "output_format": "OUTPUT FORMAT",
     "success_criteria": "SUCCESS CRITERIA"
+}
+
+PROMPT_CHAIN_SECTION_TITLES = {
+    "role_method": "ROLE AND METHOD",
+    "primary_task": "PRIMARY OPTIMIZATION TASK",
+    "source_preservation": "SOURCE AND PRESERVATION",
+    "requested_changes": "REQUESTED VISUAL CHANGES",
+    "constraints": "CONSTRAINTS",
+    "output_criteria": "OUTPUT AND DEFINITION OF DONE"
 }
 
 OUTPUT_FORMATS = {
@@ -739,19 +747,6 @@ def normalize_prompt_components(raw_components, mode=DEFAULT_MODE):
     normalized["banner"] = normalize_banner_settings(raw_components)
     normalized["generation"] = normalize_generation_settings(raw_components)
 
-    source_type = str(
-        raw_components.get("sourceType", "external_upload") or
-        "external_upload"
-    ).strip()
-
-    if source_type not in {"external_upload", "generated_library"}:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid image source type."
-        )
-
-    normalized["sourceType"] = source_type
-
     if invalid_fields:
         raise HTTPException(
             status_code=400,
@@ -988,104 +983,234 @@ def build_text_to_image_sections(components):
     ]
 
 
-def build_image_to_image_prompt(components):
-    person_concept = components.get("personConcept", "")
-    work_context = components.get("workContext", "") or components.get(
-        "brandTone",
-        ""
+def build_prompt_chain_success_criteria(components):
+    criteria = [
+        {
+            "prompt": (
+                "The primary optimization goal must be clearly visible in "
+                "the revised campaign image."
+            ),
+            "label": (
+                "Das primäre Optimierungsziel ist im überarbeiteten Motiv "
+                "klar erkennbar."
+            )
+        },
+        {
+            "prompt": (
+                "Only explicitly requested image elements may change; all "
+                "unselected elements should remain visually stable."
+            ),
+            "label": (
+                "Nur ausdrücklich ausgewählte Merkmale wurden verändert; "
+                "nicht ausgewählte Merkmale bleiben stabil."
+            )
+        },
+        {
+            "prompt": (
+                "The original fictional main person must remain recognizable, "
+                "natural, and visually consistent with the source image."
+            ),
+            "label": (
+                "Die fiktive Hauptperson bleibt wiedererkennbar, natürlich und "
+                "zum Ausgangsbild konsistent."
+            )
+        },
+        {
+            "prompt": (
+                "Work activity, gaze, gestures, hands, objects, and any social "
+                "interaction must be physically plausible and causally aligned."
+            ),
+            "label": (
+                "Tätigkeit, Blick, Gesten, Hände, Objekte und Interaktion sind "
+                "körperlich plausibel und inhaltlich aufeinander bezogen."
+            )
+        },
+        {
+            "prompt": (
+                "No company logo, readable brand name, generated campaign text, "
+                "real-employee claim, tokenism, or stereotypical depiction may "
+                "appear."
+            ),
+            "label": (
+                "Keine Logos, lesbaren Markennamen, generierten Kampagnentexte, "
+                "vorgetäuschten Beschäftigtenaussagen, Tokenismen oder "
+                "stereotypen Darstellungen."
+            )
+        },
+        {
+            "prompt": (
+                "The result must support the intended campaign use and remain "
+                "subject to human comparison and approval before publication."
+            ),
+            "label": (
+                "Das Ergebnis unterstützt den Kampagnenzweck und wird vor einer "
+                "Veröffentlichung menschlich verglichen und freigegeben."
+            )
+        }
+    ]
+
+    interaction = components.get("interaction", "")
+    includes_additional_people = (
+        interaction and
+        "only visible subject" not in interaction
     )
-    image_effect = components.get("imageEffect", "")
-    action = components.get("action", "")
-    expression = components.get("expression", "")
-    outfit = components.get("outfit", "")
-    framing = components.get("framing", "")
-    pose = components.get("pose", "")
-    gaze = components.get("gaze", "")
-    camera_angle = components.get("cameraAngle", "")
-    lighting = components.get("lighting", "")
+
+    if includes_additional_people:
+        criteria.insert(
+            4,
+            {
+                "prompt": (
+                    "Every additional fictional person must have a clear role "
+                    "in the same workplace task and must not function as visual "
+                    "decoration."
+                ),
+                "label": (
+                    "Jede zusätzliche fiktive Person erfüllt eine erkennbare "
+                    "Funktion in derselben Arbeitssituation und dient nicht nur "
+                    "als Dekoration."
+                )
+            }
+        )
+
+    return criteria
+
+
+def build_prompt_chain_sections(components):
+    optimization_goal = components.get("optimizationGoal", "")
+
+    if not optimization_goal:
+        return []
+
+    change_strength = components.get("changeStrength", "")
+    preservation_focus = components.get("preservationFocus", "")
     extra_prompt = components.get("extraPrompt", "")
     banner = components.get("banner", {})
 
-    selected_anything = any([
-        person_concept,
-        work_context,
-        image_effect,
-        action,
-        expression,
-        outfit,
-        framing,
-        pose,
-        gaze,
-        camera_angle,
-        lighting,
-        extra_prompt,
-        banner.get("enabled", False)
-    ])
+    role_text = (
+        "Apply the visual judgement of a professional employer-branding "
+        "campaign art director. This is stage 2 of a prompt chain: use the "
+        "supplied result from stage 1 as the visual source and perform one "
+        "focused refinement instead of creating an unrelated new scene."
+    )
 
-    if not selected_anything:
-        return ""
+    task_parts = [ensure_sentence(optimization_goal)]
 
-    if components.get("sourceType") == "generated_library":
-        blocks = [
-            "Continue from the supplied synthetic campaign image. Preserve "
-            "the fictional person's recognizable face structure, hairstyle, "
-            "apparent age, skin tone, natural body proportions, and overall "
-            "visual identity. Change only the requested workplace, activity, "
-            "pose, composition, or campaign details. Do not present the "
-            "fictional person as a real employee or testimonial."
-        ]
-    else:
-        blocks = [
-            "Preserve the uploaded person's identity, face structure, age, "
-            "hairstyle, skin tone, natural body proportions, and recognizable "
-            "appearance."
-        ]
+    if change_strength:
+        task_parts.append(ensure_sentence(change_strength))
 
-    if person_concept:
-        blocks.append("Main subject: " + person_concept)
+    task_text = " ".join(task_parts)
 
-    if work_context:
-        blocks.append("Work setting and activity: " + work_context)
-
-    if action:
-        blocks.append("Collaboration and action: " + action)
-
-    if pose:
-        blocks.append("Body position: the main person is " + pose + ".")
-
-    face_parts = []
-
-    if expression:
-        face_parts.append("has " + expression)
-
-    if gaze:
-        face_parts.append("is " + gaze)
-
-    if face_parts:
-        blocks.append(
-            "Face and gaze: the main person " + "; ".join(face_parts) + "."
+    source_parts = [
+        (
+            "The source image and every person shown in it are fully synthetic. "
+            "Preserve the fictional main person's recognizable face structure, "
+            "hairstyle, apparent age, skin tone, natural body proportions, and "
+            "overall visual continuity."
         )
-
-    if outfit:
-        blocks.append("Clothing: the main person is " + outfit + ".")
-
-    visual_style_parts = [
-        part
-        for part in (framing, camera_angle, lighting, image_effect)
-        if part
     ]
 
-    if visual_style_parts:
-        blocks.append(
-            "Visual style and composition: use " +
-            ", ".join(visual_style_parts) +
-            "."
-        )
+    if preservation_focus:
+        source_parts.append(ensure_sentence(preservation_focus))
+
+    source_parts.append(
+        "Treat the source image as visual material, not as evidence of a real "
+        "employee or a real workplace event."
+    )
+    source_text = " ".join(source_parts)
+
+    requested_fields = [
+        ("Workplace activity", components.get("workActivity", "")),
+        ("People and interaction", components.get("interaction", "")),
+        ("Pose and body action", components.get("pose", "")),
+        ("Gaze", components.get("gaze", "")),
+        ("Facial expression", components.get("expression", "")),
+        ("Clothing and role styling", components.get("roleStyling", "")),
+        ("Composition", components.get("composition", "")),
+        ("Visual effect", components.get("visualEffect", "")),
+        ("Quality correction", components.get("correctionFocus", ""))
+    ]
+    requested_parts = [
+        f"{label}: {ensure_sentence(value)}"
+        for label, value in requested_fields
+        if value
+    ]
 
     if extra_prompt:
-        blocks.append(ensure_sentence(extra_prompt))
+        requested_parts.append(
+            "Additional requested visual detail: " +
+            ensure_sentence(extra_prompt)
+        )
 
-    return "\n\n".join(blocks).strip()
+    if requested_parts:
+        requested_text = "\n".join(
+            f"- {part}"
+            for part in requested_parts
+        )
+    else:
+        requested_text = (
+            "Apply the primary optimization task without introducing any "
+            "additional scene, person, styling, or composition change."
+        )
+
+    constraints_text = (
+        "Change only explicitly requested elements and preserve all other "
+        "image elements as closely as possible. Do not replace the fictional "
+        "main person. Do not imitate any identifiable real person. Do not add "
+        "company logos, readable brand names, employee identification cards, "
+        "generated campaign typography, or unverifiable employment claims. "
+        "Any additional people must be fictional and must contribute naturally "
+        "to the same task; avoid tokenism, stereotypes, exaggerated enthusiasm, "
+        "and staged stock-photo poses. Keep anatomy, hands, gaze, work objects, "
+        "lighting, scale, and spatial relationships physically plausible."
+    )
+
+    output_parts = [
+        (
+            "Return one photorealistic revised employer-branding campaign image "
+            "with the same dimensions and aspect ratio as the source image."
+        )
+    ]
+
+    if banner.get("enabled"):
+        banner_position = banner.get("position", "auto")
+
+        if banner_position == "auto":
+            banner_position = "bottom"
+
+        output_parts.append(
+            "Create calm, uncluttered negative space at the " +
+            banner_position +
+            " for a separately rendered campaign banner. Do not generate the "
+            "banner text inside the image."
+        )
+
+    success_criteria = build_prompt_chain_success_criteria(components)
+    output_parts.append(
+        "Definition of done: " +
+        " ".join(
+            f"{index}. {criterion['prompt']}"
+            for index, criterion in enumerate(success_criteria, start=1)
+        )
+    )
+    output_text = " ".join(output_parts)
+
+    section_values = [
+        ("role_method", role_text),
+        ("primary_task", task_text),
+        ("source_preservation", source_text),
+        ("requested_changes", requested_text),
+        ("constraints", constraints_text),
+        ("output_criteria", output_text)
+    ]
+
+    return [
+        {
+            "id": section_id,
+            "title": PROMPT_CHAIN_SECTION_TITLES[section_id],
+            "text": text
+        }
+        for section_id, text in section_values
+    ]
 
 
 def build_prompt_package(components, mode=DEFAULT_MODE):
@@ -1105,13 +1230,20 @@ def build_prompt_package(components, mode=DEFAULT_MODE):
             "success_criteria": build_success_criteria(components)
         }
 
-    positive_prompt = build_image_to_image_prompt(components)
+    sections = build_prompt_chain_sections(components)
+    positive_prompt = "\n\n".join(
+        section["title"] + "\n" + section["text"]
+        for section in sections
+    )
 
     return {
-        "positive_prompt": positive_prompt,
+        "positive_prompt": positive_prompt.strip(),
         "negative_prompt": "",
-        "sections": [],
-        "success_criteria": []
+        "sections": sections,
+        "success_criteria": (
+            build_prompt_chain_success_criteria(components)
+            if sections else []
+        )
     }
 
 
@@ -1660,49 +1792,6 @@ def render_ai_overlay_on_image(image_bytes):
 # ComfyUI
 # ---------------------------------------------------------------------------
 
-def validate_uploaded_image(file_bytes, filename):
-    max_bytes = int(MODEL_CONFIG.get("max_upload_bytes", 15_000_000))
-    max_pixels = int(MODEL_CONFIG.get("max_upload_pixels", 30_000_000))
-
-    if not file_bytes:
-        raise HTTPException(
-            status_code=400,
-            detail="Uploaded file is empty"
-        )
-
-    if len(file_bytes) > max_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail="The uploaded image exceeds the configured size limit."
-        )
-
-    try:
-        with Image.open(BytesIO(file_bytes)) as image:
-            image_format = str(image.format or "").upper()
-            width, height = image.size
-            image.verify()
-    except Exception as exc:
-        raise HTTPException(
-            status_code=400,
-            detail="The uploaded file is not a valid image."
-        ) from exc
-
-    if image_format not in {"JPEG", "PNG", "WEBP"}:
-        raise HTTPException(
-            status_code=400,
-            detail="Only JPEG, PNG, and WebP images are supported."
-        )
-
-    if width <= 0 or height <= 0 or width * height > max_pixels:
-        raise HTTPException(
-            status_code=400,
-            detail="The uploaded image dimensions are not supported."
-        )
-
-    safe_name = Path(filename or "input.png").name
-
-    return safe_name or "input.png"
-
 def comfy_upload_image(file_bytes, filename):
     files = {
         "image": (filename, file_bytes)
@@ -1815,13 +1904,20 @@ def patch_text_to_image_workflow(
     return workflow
 
 
-def patch_image_to_image_workflow(workflow, image_name, prompt):
+def patch_prompt_chain_workflow(workflow, image_name, prompt, components):
     workflow["78"]["inputs"]["image"] = image_name
     workflow["435"]["inputs"]["value"] = prompt
     workflow["433:111"]["inputs"]["prompt"] = ["435", 0]
-    workflow["433:3"]["inputs"]["seed"] = (
-        uuid.uuid4().int % 1_000_000_000_000_000
-    )
+    generation_settings = components.get("generation", {})
+
+    if generation_settings.get("fixed_seed"):
+        workflow["433:3"]["inputs"]["seed"] = int(
+            generation_settings["seed"]
+        )
+    else:
+        workflow["433:3"]["inputs"]["seed"] = (
+            uuid.uuid4().int % 1_000_000_000_000_000
+        )
 
     return workflow
 
@@ -1848,13 +1944,14 @@ def patch_workflow(
     if not image_name:
         raise HTTPException(
             status_code=400,
-            detail="Image-to-Image mode requires an uploaded image."
+            detail="Prompt Chain mode requires a saved source image."
         )
 
-    return patch_image_to_image_workflow(
+    return patch_prompt_chain_workflow(
         workflow,
         image_name,
-        prompt
+        prompt,
+        components
     )
 
 
@@ -1918,8 +2015,6 @@ def public_config():
             "id": mode_name,
             "label": mode_config.get("label", mode_name),
             "description": mode_config.get("description", ""),
-            "experimental": bool(mode_config.get("experimental", False)),
-            "requires_upload": bool(mode_config.get("requires_upload", False)),
             "requires_library_source": bool(
                 mode_config.get("requires_library_source", False)
             )
@@ -2067,9 +2162,7 @@ async def preview_prompt(payload: dict = Body(...)):
 async def run(
     prompt_components: str = Form(...),
     mode: str = Form(DEFAULT_MODE),
-    consent_confirmed: bool = Form(False),
-    library_source_id: str = Form(""),
-    file: Optional[UploadFile] = File(None)
+    library_source_id: str = Form("")
 ):
     normalized_mode = normalize_mode(mode)
     mode_config = get_mode_config(normalized_mode)
@@ -2110,15 +2203,11 @@ async def run(
                 )
             )
 
-        components["sourceType"] = "generated_library"
     elif mode_config.get("requires_library_source"):
         raise HTTPException(
             status_code=400,
             detail="Prompt Chain mode requires a saved library image."
         )
-    elif normalized_mode != "text_to_image":
-        components["sourceType"] = "external_upload"
-
     prompt_package = build_prompt_package(
         components,
         normalized_mode
@@ -2143,46 +2232,20 @@ async def run(
 
     stored_image_name = None
 
-    if (
-        mode_config.get("requires_upload") or
-        mode_config.get("requires_library_source")
-    ):
-        if library_source_row is not None:
-            source_path = (
-                LIBRARY_IMAGES_DIR /
-                library_source_row["source_filename"]
+    if mode_config.get("requires_library_source"):
+        source_path = (
+            LIBRARY_IMAGES_DIR /
+            library_source_row["source_filename"]
+        )
+
+        if not source_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail="The saved source image is no longer available."
             )
 
-            if not source_path.exists():
-                raise HTTPException(
-                    status_code=404,
-                    detail="The saved source image is no longer available."
-                )
-
-            image_bytes = source_path.read_bytes()
-            safe_filename = source_path.name
-        else:
-            if not consent_confirmed:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        "Image-to-Image mode requires confirmation that the "
-                        "uploaded image may be processed and altered."
-                    )
-                )
-
-            if file is None:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Image-to-Image mode requires a source image."
-                )
-
-            image_bytes = await file.read()
-            safe_filename = validate_uploaded_image(
-                image_bytes,
-                file.filename
-            )
-
+        image_bytes = source_path.read_bytes()
+        safe_filename = source_path.name
         stored_image_name = comfy_upload_image(
             image_bytes,
             safe_filename

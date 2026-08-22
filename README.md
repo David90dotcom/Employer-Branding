@@ -4,10 +4,15 @@ Lokaler Prototyp zur standardisierten Erstellung von Employer-Branding-Bildmotiv
 
 ## Modi
 
-- **Text-to-Image (Standard):** erzeugt vollständig fiktive Personen und Arbeitsszenen ohne Upload eines Personenfotos.
-- **Image-to-Image (experimentell):** bearbeitet ein berechtigt hochgeladenes Bild mit dem bisherigen Qwen-Image-Edit-Workflow. Dieser Modus verlangt eine Einwilligungsbestätigung im Browser und prüft diese zusätzlich auf dem Server. Auch Dateityp, Dateigröße und Bildabmessungen werden serverseitig kontrolliert.
+- **Stufe 1 - Text-to-Image:** erzeugt vollständig fiktive Personen und
+  Arbeitsszenen ohne Upload eines Personenfotos.
+- **Stufe 2 - Prompt Chain / Optimierung:** übernimmt ausschließlich ein bewusst
+  gespeichertes synthetisches Ergebnis aus Stufe 1 und optimiert es mit einem
+  fokussierten zweiten Prompt.
 
-Beide Modi verwenden dieselbe serverseitige Prompt-Erzeugung, Ergebnisanzeige, optionale Kampagnen-Banner und den Hinweis `KI-generiert`.
+Ein separater Upload- oder Image-to-Image-Modus für reale Personenbilder ist
+nicht Bestandteil der aktuellen Anwendung. Beide Stufen verwenden dieselbe
+Ergebnisanzeige, optionale Kampagnen-Banner und den Hinweis `KI-generiert`.
 
 ## Prompt Engineering Lab
 
@@ -62,11 +67,24 @@ Qwen-Edit-Workflow übergeben werden. Die saubere Bearbeitungsquelle verhindert,
 dass der Transparenzhinweis oder ein zuvor eingefügter Banner Teil der nächsten
 Bildgenerierung wird.
 
+Die zweite Stufe ist als kontrollierte Kampagnenoptimierung aufgebaut. Sie
+verlangt ein primäres Optimierungsziel und gliedert den Prompt in:
+
+1. `ROLE AND METHOD`
+2. `PRIMARY OPTIMIZATION TASK`
+3. `SOURCE AND PRESERVATION`
+4. `REQUESTED VISUAL CHANGES`
+5. `CONSTRAINTS`
+6. `OUTPUT AND DEFINITION OF DONE`
+
+Ausgewählt werden können Änderungsstärke, Erhaltungsfokus, Tätigkeit,
+Personenzahl und Interaktion, Pose, Blick, Gesichtsausdruck, Rollenwirkung,
+Kampagnenkomposition, Bildwirkung sowie eine konkrete Qualitätskorrektur.
+Nicht ausgewählte Merkmale sollen möglichst stabil bleiben. Ein fester Seed
+ermöglicht auch in Stufe 2 besser kontrollierbare Promptvergleiche.
+
 Die Kampagnenbibliothek liegt ausschließlich unter `webapp/data/` und wird von
 Git ignoriert. Sie wird daher weder committed noch nach GitHub hochgeladen.
-Ergebnisse aus dem experimentellen Uploadmodus für reale Personen werden nicht
-in der synthetischen Kampagnenbibliothek gespeichert. Sie bleiben temporär und
-können auch nicht als Ausgangsbilder der Prompt Chain verwendet werden.
 
 ## Standardmodell für Text-to-Image
 
@@ -113,13 +131,21 @@ Für einen späteren Modellwechsel werden Modellnamen und Text-to-Image-Paramete
 
 ## Datenschutz und Transparenz
 
-Text-to-Image ist der Standard, damit keine realen Personenfotos für die reguläre Kampagnengenerierung verarbeitet werden. Die Ergebnisse zeigen fiktive KI-Personen und dürfen nicht als echte Beschäftigte oder Testimonials ausgegeben werden. Jedes Ergebnis erhält automatisiert den eingebetteten Hinweis `KI-generiert` und muss vor einer Nutzung fachlich, ethisch sowie markenrechtlich geprüft werden.
+Die Anwendung verarbeitet keine hochgeladenen realen Personenfotos. Die
+Ergebnisse zeigen fiktive KI-Personen und dürfen nicht als echte Beschäftigte
+oder Testimonials ausgegeben werden. Jedes Ergebnis erhält automatisiert den
+eingebetteten Hinweis `KI-generiert` und muss vor einer Nutzung fachlich,
+ethisch sowie markenrechtlich geprüft werden.
 
 Reale Unternehmenslogos werden nicht durch das Modell generiert und sind nicht Bestandteil des Repositorys. Ein berechtigt verwendetes Logo sollte erst nach der Generierung als exakter Overlay ergänzt werden.
 
-Generierte Bilder werden lokal unter `webapp/static/generated/` gespeichert. Der Inhalt dieses Ordners wird von Git ignoriert; nur `.gitkeep` bleibt versioniert.
+Temporäre Ergebnisse und die bewusst gespeicherte Kampagnenbibliothek liegen
+lokal unter `webapp/data/`. Dieser Bereich wird von Git ignoriert und nicht in
+das öffentliche Repository übernommen.
 
 ## Entwicklungszweige
 
 - `archive/image-to-image-v1`: unveränderter Ausgangsstand der ursprünglichen Image-to-Image-Version
-- `feature/text-to-image-default`: Entwicklung von Text-to-Image als Standard und Image-to-Image als experimenteller Zusatzmodus
+- `feature/text-to-image-default`: Einführung von Text-to-Image als Standard
+- `feature/prompt-engineering-lab`: strukturierter Promptbaukasten für Stufe 1
+- `feature/prompt-chain-library`: lokale Kampagnenbibliothek und verkettete Optimierungsstufe
