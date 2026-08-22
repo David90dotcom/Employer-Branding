@@ -2,6 +2,7 @@
   "default_mode": "text_to_image",
   "max_upload_bytes": 15000000,
   "max_upload_pixels": 30000000,
+  "temporary_result_retention_hours": 24,
   "modes": {
     "text_to_image": {
       "label": "Text-to-Image",
@@ -39,11 +40,21 @@
         "sampler": "8"
       }
     },
+    "prompt_chain": {
+      "label": "Prompt Chain",
+      "description": "Bearbeitet ein bewusst gespeichertes, vollständig synthetisches Kampagnenbild als zweite Generierungsstufe weiter.",
+      "experimental": false,
+      "requires_upload": false,
+      "requires_library_source": true,
+      "workflow": "workflow_template.json",
+      "ui_fields": "ui_fields.json"
+    },
     "image_to_image": {
-      "label": "Image-to-Image",
-      "description": "Experimentelle Bearbeitung eines berechtigt hochgeladenen Personenbildes.",
+      "label": "Eigenes Bild bearbeiten",
+      "description": "Experimentelle Bearbeitung eines berechtigt hochgeladenen realen Personenbildes.",
       "experimental": true,
       "requires_upload": true,
+      "requires_library_source": false,
       "workflow": "workflow_template.json",
       "ui_fields": "ui_fields.json"
     }

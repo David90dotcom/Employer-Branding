@@ -3,6 +3,9 @@ webapp/static/generated/*
 !webapp/static/generated/.gitkeep
 webapp/static/indexsave.txt
 
+# Nur lokal gespeicherte Kampagnenbibliothek
+webapp/data/
+
 # Lokale Test- und Altdateien
 webapp/workflowTest.text
 webapp/presets.json

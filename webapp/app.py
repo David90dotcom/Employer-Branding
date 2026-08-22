@@ -4,12 +4,14 @@ from fastapi.staticfiles import StaticFiles
 
 import json
 import os
+import sqlite3
 import uuid
 import requests
 import time
 import threading
 import websocket
 
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 from typing import Optional
@@ -26,6 +28,17 @@ INDEX_PATH = BASE_DIR / "static" / "index.html"
 
 GENERATED_DIR = BASE_DIR / "static" / "generated"
 GENERATED_DIR.mkdir(parents=True, exist_ok=True)
+
+DATA_DIR = BASE_DIR / "data"
+TEMP_RESULTS_DIR = DATA_DIR / "temporary_results"
+LIBRARY_DIR = DATA_DIR / "campaign_library"
+LIBRARY_IMAGES_DIR = LIBRARY_DIR / "images"
+LIBRARY_THUMBNAILS_DIR = LIBRARY_DIR / "thumbnails"
+LIBRARY_DB_PATH = LIBRARY_DIR / "library.sqlite3"
+
+TEMP_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+LIBRARY_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+LIBRARY_THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
 
 ASSETS_DIR = BASE_DIR / "static" / "assets"
 ASSETS_DIR.mkdir(parents=True, exist_ok=True)
@@ -68,6 +81,18 @@ DEBUG_PROMPTS = os.getenv(
 
 progress_state = {
     "value": 0
+}
+
+TEMP_RESULTS = {}
+TEMP_RESULTS_LOCK = threading.Lock()
+
+TEMP_RESULT_RETENTION_HOURS = int(
+    MODEL_CONFIG.get("temporary_result_retention_hours", 24)
+)
+
+LIBRARY_SAVEABLE_MODES = {
+    "text_to_image",
+    "prompt_chain"
 }
 
 TEXT_TO_IMAGE_SECTION_TITLES = {
@@ -138,6 +163,401 @@ def no_cache_headers():
         "Pragma": "no-cache",
         "Expires": "0"
     }
+
+
+# ---------------------------------------------------------------------------
+# Lokale Kampagnenbibliothek
+# ---------------------------------------------------------------------------
+
+def utc_now_iso():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def normalize_asset_id(raw_id, label="asset id"):
+    try:
+        return uuid.UUID(str(raw_id or "")).hex
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {label}."
+        ) from exc
+
+
+def library_connection():
+    connection = sqlite3.connect(
+        str(LIBRARY_DB_PATH),
+        timeout=10
+    )
+    connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA foreign_keys = ON")
+    return connection
+
+
+def init_library_storage():
+    LIBRARY_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    LIBRARY_THUMBNAILS_DIR.mkdir(parents=True, exist_ok=True)
+
+    with library_connection() as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS campaign_assets (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                saved_at TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                parent_id TEXT,
+                filename TEXT NOT NULL,
+                source_filename TEXT NOT NULL,
+                thumbnail_filename TEXT NOT NULL,
+                positive_prompt TEXT NOT NULL,
+                negative_prompt TEXT NOT NULL,
+                components_json TEXT NOT NULL,
+                seed INTEGER,
+                model_name TEXT NOT NULL,
+                width INTEGER NOT NULL,
+                height INTEGER NOT NULL,
+                FOREIGN KEY(parent_id)
+                    REFERENCES campaign_assets(id)
+                    ON DELETE SET NULL
+            )
+            """
+        )
+
+
+def cleanup_temporary_result_files():
+    if TEMP_RESULT_RETENTION_HOURS <= 0:
+        return
+
+    cutoff = time.time() - TEMP_RESULT_RETENTION_HOURS * 60 * 60
+
+    def entry_is_expired(entry):
+        try:
+            return (
+                entry["display_path"].stat().st_mtime < cutoff or
+                entry["source_path"].stat().st_mtime < cutoff
+            )
+        except OSError:
+            return True
+
+    with TEMP_RESULTS_LOCK:
+        expired_entries = [
+            entry
+            for entry in TEMP_RESULTS.values()
+            if entry_is_expired(entry)
+        ]
+
+        for entry in expired_entries:
+            TEMP_RESULTS.pop(entry["id"], None)
+
+    for entry in expired_entries:
+        for key in ("display_path", "source_path"):
+            try:
+                entry[key].unlink()
+            except FileNotFoundError:
+                pass
+
+    for directory, pattern in (
+        (TEMP_RESULTS_DIR, "*.png"),
+        (GENERATED_DIR, "campaign_*.png")
+    ):
+        paths = directory.glob(pattern)
+
+        for path in paths:
+            try:
+                if path.stat().st_mtime < cutoff:
+                    path.unlink()
+            except OSError:
+                continue
+
+
+def create_thumbnail(image_bytes, max_size=(420, 260)):
+    with Image.open(BytesIO(image_bytes)) as image:
+        thumbnail = image.convert("RGB")
+        thumbnail.thumbnail(max_size, Image.LANCZOS)
+
+        output = BytesIO()
+        thumbnail.save(
+            output,
+            format="PNG",
+            optimize=True
+        )
+        return output.getvalue()
+
+
+def register_temporary_result(display_bytes, source_bytes, metadata):
+    cleanup_temporary_result_files()
+    TEMP_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    result_id = uuid.uuid4().hex
+    display_path = TEMP_RESULTS_DIR / f"{result_id}_display.png"
+    source_path = TEMP_RESULTS_DIR / f"{result_id}_source.png"
+
+    display_path.write_bytes(display_bytes)
+    source_path.write_bytes(source_bytes)
+
+    entry = {
+        "id": result_id,
+        "display_path": display_path,
+        "source_path": source_path,
+        "created_at": utc_now_iso(),
+        "library_id": None,
+        **metadata
+    }
+
+    with TEMP_RESULTS_LOCK:
+        TEMP_RESULTS[result_id] = entry
+
+    return {
+        "result_id": result_id,
+        "view_url": f"/api/results/{result_id}/image",
+        "saved": False,
+        "mode": entry.get("mode", DEFAULT_MODE),
+        "parent_id": entry.get("parent_id")
+    }
+
+
+def get_temporary_result(raw_result_id):
+    result_id = normalize_asset_id(raw_result_id, "result id")
+
+    with TEMP_RESULTS_LOCK:
+        entry = TEMP_RESULTS.get(result_id)
+
+    if not entry:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "Temporary result not found. It may have expired or the "
+                "application may have been restarted."
+            )
+        )
+
+    if not entry["display_path"].exists() or not entry["source_path"].exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Temporary result files are no longer available."
+        )
+
+    return entry
+
+
+def serialize_library_row(row):
+    components = json.loads(row["components_json"] or "{}")
+
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "created_at": row["created_at"],
+        "saved_at": row["saved_at"],
+        "mode": row["mode"],
+        "parent_id": row["parent_id"],
+        "positive_prompt": row["positive_prompt"],
+        "negative_prompt": row["negative_prompt"],
+        "components": components,
+        "seed": row["seed"],
+        "model_name": row["model_name"],
+        "width": row["width"],
+        "height": row["height"],
+        "image_url": f"/api/library/{row['id']}/image",
+        "thumbnail_url": f"/api/library/{row['id']}/thumbnail"
+    }
+
+
+def get_library_row(raw_item_id):
+    item_id = normalize_asset_id(raw_item_id, "library item id")
+
+    with library_connection() as connection:
+        row = connection.execute(
+            "SELECT * FROM campaign_assets WHERE id = ?",
+            (item_id,)
+        ).fetchone()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail="Library item not found."
+        )
+
+    return row
+
+
+def list_library_items():
+    with library_connection() as connection:
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM campaign_assets
+            ORDER BY saved_at DESC
+            """
+        ).fetchall()
+
+    return [serialize_library_row(row) for row in rows]
+
+
+def resolve_mode_model_name(mode):
+    mode_config = get_mode_config(mode)
+    configured_name = mode_config.get("model", {}).get("unet_name")
+
+    if configured_name:
+        return configured_name
+
+    for node in WORKFLOW_TEMPLATES.get(mode, {}).values():
+        unet_name = node.get("inputs", {}).get("unet_name")
+
+        if unet_name:
+            return unet_name
+
+    return mode_config.get("label", mode)
+
+
+def persist_temporary_result(raw_result_id, title=""):
+    entry = get_temporary_result(raw_result_id)
+
+    if entry.get("mode") not in LIBRARY_SAVEABLE_MODES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Only fully synthetic Text-to-Image and Prompt Chain "
+                "results can be saved in the campaign library."
+            )
+        )
+
+    if entry.get("library_id"):
+        try:
+            return serialize_library_row(
+                get_library_row(entry["library_id"])
+            )
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
+
+            with TEMP_RESULTS_LOCK:
+                entry["library_id"] = None
+
+    cleaned_title = " ".join(str(title or "").split())
+
+    if len(cleaned_title) > 100:
+        raise HTTPException(
+            status_code=400,
+            detail="Library title is too long."
+        )
+
+    if not cleaned_title:
+        cleaned_title = "Gespeichertes Kampagnenmotiv"
+
+    item_id = uuid.uuid4().hex
+    filename = f"{item_id}.png"
+    source_filename = f"{item_id}_source.png"
+    thumbnail_filename = f"{item_id}_thumb.png"
+
+    display_bytes = entry["display_path"].read_bytes()
+    source_bytes = entry["source_path"].read_bytes()
+
+    image_path = LIBRARY_IMAGES_DIR / filename
+    source_path = LIBRARY_IMAGES_DIR / source_filename
+    thumbnail_path = LIBRARY_THUMBNAILS_DIR / thumbnail_filename
+
+    image_path.write_bytes(display_bytes)
+    source_path.write_bytes(source_bytes)
+    thumbnail_path.write_bytes(create_thumbnail(display_bytes))
+
+    with Image.open(BytesIO(display_bytes)) as image:
+        width, height = image.size
+
+    components = entry.get("components", {})
+    generation = components.get("generation", {})
+    seed = generation.get("actual_seed")
+
+    if seed is None and generation.get("fixed_seed"):
+        seed = generation.get("seed")
+    mode = entry.get("mode", DEFAULT_MODE)
+    model_name = resolve_mode_model_name(mode)
+
+    with library_connection() as connection:
+        connection.execute(
+            """
+            INSERT INTO campaign_assets (
+                id,
+                title,
+                created_at,
+                saved_at,
+                mode,
+                parent_id,
+                filename,
+                source_filename,
+                thumbnail_filename,
+                positive_prompt,
+                negative_prompt,
+                components_json,
+                seed,
+                model_name,
+                width,
+                height
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                item_id,
+                cleaned_title,
+                entry["created_at"],
+                utc_now_iso(),
+                mode,
+                entry.get("parent_id"),
+                filename,
+                source_filename,
+                thumbnail_filename,
+                entry.get("positive_prompt", ""),
+                entry.get("negative_prompt", ""),
+                json.dumps(components, ensure_ascii=False),
+                seed,
+                model_name,
+                width,
+                height
+            )
+        )
+
+    with TEMP_RESULTS_LOCK:
+        entry["library_id"] = item_id
+
+    return serialize_library_row(get_library_row(item_id))
+
+
+def delete_library_item(raw_item_id):
+    row = get_library_row(raw_item_id)
+
+    paths = [
+        LIBRARY_IMAGES_DIR / row["filename"],
+        LIBRARY_IMAGES_DIR / row["source_filename"],
+        LIBRARY_THUMBNAILS_DIR / row["thumbnail_filename"]
+    ]
+
+    with library_connection() as connection:
+        connection.execute(
+            "DELETE FROM campaign_assets WHERE id = ?",
+            (row["id"],)
+        )
+
+    for path in paths:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def delete_temporary_result(raw_result_id):
+    entry = get_temporary_result(raw_result_id)
+
+    for key in ("display_path", "source_path"):
+        try:
+            entry[key].unlink()
+        except FileNotFoundError:
+            pass
+
+    with TEMP_RESULTS_LOCK:
+        TEMP_RESULTS.pop(entry["id"], None)
+
+
+init_library_storage()
+cleanup_temporary_result_files()
 
 
 # ---------------------------------------------------------------------------
@@ -318,6 +738,19 @@ def normalize_prompt_components(raw_components, mode=DEFAULT_MODE):
     normalized["extraPrompt"] = extra_prompt
     normalized["banner"] = normalize_banner_settings(raw_components)
     normalized["generation"] = normalize_generation_settings(raw_components)
+
+    source_type = str(
+        raw_components.get("sourceType", "external_upload") or
+        "external_upload"
+    ).strip()
+
+    if source_type not in {"external_upload", "generated_library"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid image source type."
+        )
+
+    normalized["sourceType"] = source_type
 
     if invalid_fields:
         raise HTTPException(
@@ -592,11 +1025,21 @@ def build_image_to_image_prompt(components):
     if not selected_anything:
         return ""
 
-    blocks = [
-        "Preserve the uploaded person's identity, face structure, age, "
-        "hairstyle, skin tone, natural body proportions, and recognizable "
-        "appearance."
-    ]
+    if components.get("sourceType") == "generated_library":
+        blocks = [
+            "Continue from the supplied synthetic campaign image. Preserve "
+            "the fictional person's recognizable face structure, hairstyle, "
+            "apparent age, skin tone, natural body proportions, and overall "
+            "visual identity. Change only the requested workplace, activity, "
+            "pose, composition, or campaign details. Do not present the "
+            "fictional person as a real employee or testimonial."
+        ]
+    else:
+        blocks = [
+            "Preserve the uploaded person's identity, face structure, age, "
+            "hairstyle, skin tone, natural body proportions, and recognizable "
+            "appearance."
+        ]
 
     if person_concept:
         blocks.append("Main subject: " + person_concept)
@@ -1213,14 +1656,6 @@ def render_ai_overlay_on_image(image_bytes):
     return output.getvalue()
 
 
-def save_generated_image(image_bytes):
-    filename = f"campaign_{uuid.uuid4().hex}.png"
-    path = GENERATED_DIR / filename
-    path.write_bytes(image_bytes)
-
-    return f"/static/generated/{filename}"
-
-
 # ---------------------------------------------------------------------------
 # ComfyUI
 # ---------------------------------------------------------------------------
@@ -1484,7 +1919,10 @@ def public_config():
             "label": mode_config.get("label", mode_name),
             "description": mode_config.get("description", ""),
             "experimental": bool(mode_config.get("experimental", False)),
-            "requires_upload": bool(mode_config.get("requires_upload", False))
+            "requires_upload": bool(mode_config.get("requires_upload", False)),
+            "requires_library_source": bool(
+                mode_config.get("requires_library_source", False)
+            )
         })
 
     return JSONResponse(
@@ -1503,6 +1941,94 @@ def ui_fields(mode: str = Query(DEFAULT_MODE)):
 
     return JSONResponse(
         content=fields,
+        headers=no_cache_headers()
+    )
+
+
+@app.get("/api/library")
+def campaign_library():
+    return JSONResponse(
+        content={"items": list_library_items()},
+        headers=no_cache_headers()
+    )
+
+
+@app.get("/api/library/{item_id}/image")
+def campaign_library_image(item_id: str):
+    row = get_library_row(item_id)
+    path = LIBRARY_IMAGES_DIR / row["filename"]
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Saved image file not found."
+        )
+
+    return FileResponse(
+        str(path),
+        media_type="image/png",
+        headers=no_cache_headers()
+    )
+
+
+@app.get("/api/library/{item_id}/thumbnail")
+def campaign_library_thumbnail(item_id: str):
+    row = get_library_row(item_id)
+    path = LIBRARY_THUMBNAILS_DIR / row["thumbnail_filename"]
+
+    if not path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Saved thumbnail file not found."
+        )
+
+    return FileResponse(
+        str(path),
+        media_type="image/png",
+        headers=no_cache_headers()
+    )
+
+
+@app.post("/api/library/save")
+async def save_to_campaign_library(payload: dict = Body(...)):
+    item = persist_temporary_result(
+        payload.get("result_id"),
+        payload.get("title", "")
+    )
+
+    return JSONResponse(
+        content={"item": item},
+        headers=no_cache_headers()
+    )
+
+
+@app.get("/api/results/{result_id}/image")
+def temporary_result_image(result_id: str):
+    entry = get_temporary_result(result_id)
+
+    return FileResponse(
+        str(entry["display_path"]),
+        media_type="image/png",
+        headers=no_cache_headers()
+    )
+
+
+@app.delete("/api/library/{item_id}")
+def remove_from_campaign_library(item_id: str):
+    delete_library_item(item_id)
+
+    return JSONResponse(
+        content={"deleted": True},
+        headers=no_cache_headers()
+    )
+
+
+@app.delete("/api/results/{result_id}")
+def discard_temporary_result(result_id: str):
+    delete_temporary_result(result_id)
+
+    return JSONResponse(
+        content={"deleted": True},
         headers=no_cache_headers()
     )
 
@@ -1542,6 +2068,7 @@ async def run(
     prompt_components: str = Form(...),
     mode: str = Form(DEFAULT_MODE),
     consent_confirmed: bool = Form(False),
+    library_source_id: str = Form(""),
     file: Optional[UploadFile] = File(None)
 ):
     normalized_mode = normalize_mode(mode)
@@ -1559,6 +2086,39 @@ async def run(
         raw_components,
         normalized_mode
     )
+
+    library_source_row = None
+
+    if library_source_id:
+        if not mode_config.get("requires_library_source"):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "A saved library image can only be used in Prompt Chain "
+                    "mode."
+                )
+            )
+
+        library_source_row = get_library_row(library_source_id)
+
+        if library_source_row["mode"] not in LIBRARY_SAVEABLE_MODES:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Prompt Chain mode only accepts fully synthetic library "
+                    "images."
+                )
+            )
+
+        components["sourceType"] = "generated_library"
+    elif mode_config.get("requires_library_source"):
+        raise HTTPException(
+            status_code=400,
+            detail="Prompt Chain mode requires a saved library image."
+        )
+    elif normalized_mode != "text_to_image":
+        components["sourceType"] = "external_upload"
+
     prompt_package = build_prompt_package(
         components,
         normalized_mode
@@ -1583,27 +2143,46 @@ async def run(
 
     stored_image_name = None
 
-    if mode_config.get("requires_upload"):
-        if not consent_confirmed:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Image-to-Image mode requires confirmation that the "
-                    "image may be processed and altered."
+    if (
+        mode_config.get("requires_upload") or
+        mode_config.get("requires_library_source")
+    ):
+        if library_source_row is not None:
+            source_path = (
+                LIBRARY_IMAGES_DIR /
+                library_source_row["source_filename"]
+            )
+
+            if not source_path.exists():
+                raise HTTPException(
+                    status_code=404,
+                    detail="The saved source image is no longer available."
                 )
+
+            image_bytes = source_path.read_bytes()
+            safe_filename = source_path.name
+        else:
+            if not consent_confirmed:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Image-to-Image mode requires confirmation that the "
+                        "uploaded image may be processed and altered."
+                    )
+                )
+
+            if file is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Image-to-Image mode requires a source image."
+                )
+
+            image_bytes = await file.read()
+            safe_filename = validate_uploaded_image(
+                image_bytes,
+                file.filename
             )
 
-        if file is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Image-to-Image mode requires an uploaded image."
-            )
-
-        image_bytes = await file.read()
-        safe_filename = validate_uploaded_image(
-            image_bytes,
-            file.filename
-        )
         stored_image_name = comfy_upload_image(
             image_bytes,
             safe_filename
@@ -1620,6 +2199,14 @@ async def run(
         negative_prompt=negative_prompt
     )
 
+    if normalized_mode == "text_to_image":
+        sampler_node = get_mode_config(normalized_mode)["nodes"]["sampler"]
+        actual_seed = workflow[sampler_node]["inputs"]["seed"]
+    else:
+        actual_seed = workflow["433:3"]["inputs"]["seed"]
+
+    components.setdefault("generation", {})["actual_seed"] = actual_seed
+
     progress_state["value"] = 0
 
     prompt_id = queue_prompt(workflow)
@@ -1632,6 +2219,7 @@ async def run(
 
     images = wait_for_result(prompt_id)
 
+    results = []
     view_urls = []
 
     banner = components.get("banner", {})
@@ -1652,21 +2240,36 @@ async def run(
 
         response.raise_for_status()
 
-        final_image_bytes = response.content
+        source_image_bytes = response.content
+        display_image_bytes = source_image_bytes
 
         if banner.get("enabled"):
-            final_image_bytes = render_banner_on_image(
-                final_image_bytes,
+            display_image_bytes = render_banner_on_image(
+                display_image_bytes,
                 banner
             )
 
-        final_image_bytes = render_ai_overlay_on_image(
-            final_image_bytes
+        display_image_bytes = render_ai_overlay_on_image(
+            display_image_bytes
         )
 
-        view_urls.append(
-            save_generated_image(final_image_bytes)
+        result = register_temporary_result(
+            display_bytes=display_image_bytes,
+            source_bytes=source_image_bytes,
+            metadata={
+                "mode": normalized_mode,
+                "parent_id": (
+                    library_source_row["id"]
+                    if library_source_row is not None
+                    else None
+                ),
+                "positive_prompt": final_prompt,
+                "negative_prompt": negative_prompt,
+                "components": components
+            }
         )
+        results.append(result)
+        view_urls.append(result["view_url"])
 
     return JSONResponse(
         content={
@@ -1677,6 +2280,7 @@ async def run(
             "prompt_sections": prompt_package["sections"],
             "success_criteria": prompt_package["success_criteria"],
             "prompt_components": components,
+            "results": results,
             "view_urls": view_urls
         },
         headers=no_cache_headers()

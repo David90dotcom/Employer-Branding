@@ -17,7 +17,7 @@
       </div>
     </div>
 
-    <div class="badge">Strukturierter Zero-shot · Text-to-Image</div>
+    <div id="modeBadge" class="badge">Strukturierter Zero-shot · Text-to-Image</div>
   </div>
 
   <div class="stack">
@@ -62,12 +62,30 @@
       >
     </div>
 
+    <div id="chainSourceCard" class="card chain-source-card" hidden>
+      <div class="chain-source-preview">
+        <img id="chainSourceImage" alt="Gespeichertes Ausgangsbild">
+      </div>
+      <div>
+        <span class="chain-step-label">Prompt Chain · Stufe 2</span>
+        <h3 id="chainSourceTitle">Gespeichertes Kampagnenmotiv</h3>
+        <p>
+          Dieses synthetische Bild wird als Ausgangspunkt verwendet. Die
+          Bearbeitung soll die fiktive Person wiedererkennbar erhalten und nur
+          die ausgewählten Kampagnendetails verändern.
+        </p>
+        <button id="clearChainSource" type="button" class="secondary-button">
+          Anderes Bibliotheksbild wählen
+        </button>
+      </div>
+    </div>
+
     <div class="card prompt-lab-card">
 
       <div class="section-heading prompt-lab-heading">
         <div>
           <h3>Prompt-Aufbau</h3>
-          <p class="mode-description">
+          <p id="promptLabDescription" class="mode-description">
             Die Auswahlfelder werden serverseitig in sieben nachvollziehbare
             Promptabschnitte übersetzt. Marken- und Unternehmensnamen werden
             nicht in das Modellprompt übernommen.
@@ -233,8 +251,8 @@
       <div id="frameworkOutput" class="framework-output">
         <div class="framework-output-heading">
           <div>
-            <h3>Strukturierter Gesamtprompt</h3>
-            <p>
+            <h3 id="frameworkTitle">Strukturierter Gesamtprompt</h3>
+            <p id="frameworkDescription">
               Ein positiver Gesamtprompt mit klaren Abschnitten plus separater
               Negative Prompt – kein Bündel unverbundener Einzelprompts.
             </p>
@@ -256,7 +274,7 @@
             ></textarea>
           </div>
 
-          <div class="field">
+          <div id="negativePromptField" class="field">
             <label for="negativePrompt">
               Negative Prompt
             </label>
@@ -268,7 +286,7 @@
           </div>
         </div>
 
-        <div class="success-panel">
+        <div id="successPanel" class="success-panel">
           <strong>Automatisch abgeleitete Erfolgskriterien</strong>
           <ul id="successCriteria"></ul>
         </div>
@@ -320,9 +338,29 @@
       </div>
     </div>
 
-    <div>
+    <div id="resultsSection">
       <h3>Ergebnisse</h3>
       <div id="gallery" class="gallery"></div>
+    </div>
+
+    <div class="card library-card">
+      <div class="library-heading">
+        <div>
+          <h3>Kampagnenbibliothek</h3>
+          <p>
+            Nur Ergebnisse, die ausdrücklich gespeichert wurden, erscheinen
+            dauerhaft in dieser lokalen Bibliothek.
+          </p>
+        </div>
+        <button id="refreshLibrary" type="button" class="secondary-button compact-button">
+          Aktualisieren
+        </button>
+      </div>
+
+      <div id="libraryEmpty" class="library-empty">
+        Noch keine Kampagnenmotive gespeichert.
+      </div>
+      <div id="libraryGallery" class="library-gallery"></div>
     </div>
 
   </div>
@@ -330,8 +368,14 @@
   <script>
     const modePicker = document.getElementById("modePicker");
     const modeDescription = document.getElementById("modeDescription");
+    const modeBadge = document.getElementById("modeBadge");
+    const promptLabDescription = document.getElementById("promptLabDescription");
     const textToImageNotice = document.getElementById("textToImageNotice");
     const uploadCard = document.getElementById("uploadCard");
+    const chainSourceCard = document.getElementById("chainSourceCard");
+    const chainSourceImage = document.getElementById("chainSourceImage");
+    const chainSourceTitle = document.getElementById("chainSourceTitle");
+    const clearChainSource = document.getElementById("clearChainSource");
     const consentSection = document.getElementById("consentSection");
     const drop = document.getElementById("drop");
     const dropPlaceholder = document.getElementById("dropPlaceholder");
@@ -341,8 +385,12 @@
     const extraPrompt = document.getElementById("extraPrompt");
     const finalPrompt = document.getElementById("finalPrompt");
     const negativePrompt = document.getElementById("negativePrompt");
+    const negativePromptField = document.getElementById("negativePromptField");
+    const frameworkTitle = document.getElementById("frameworkTitle");
+    const frameworkDescription = document.getElementById("frameworkDescription");
     const promptSections = document.getElementById("promptSections");
     const successCriteria = document.getElementById("successCriteria");
+    const successPanel = document.getElementById("successPanel");
     const experimentSettings = document.getElementById("experimentSettings");
     const mandatoryConstraints = document.getElementById("mandatoryConstraints");
     const fixedSeedEnabled = document.getElementById("fixedSeedEnabled");
@@ -354,6 +402,9 @@
     const bar = document.getElementById("bar");
     const statusEl = document.getElementById("status");
     const gallery = document.getElementById("gallery");
+    const libraryGallery = document.getElementById("libraryGallery");
+    const libraryEmpty = document.getElementById("libraryEmpty");
+    const refreshLibrary = document.getElementById("refreshLibrary");
 
     const bannerEnabled = document.getElementById("bannerEnabled");
     const bannerSettings = document.getElementById("bannerSettings");
@@ -373,6 +424,8 @@
     let lastNegativePrompt = "";
     let currentMode = "text_to_image";
     let availableModes = [];
+    let selectedLibrarySource = null;
+    let libraryItems = [];
 
 
     // ------------------------------------------------------------
@@ -474,11 +527,29 @@
         const state = document.createElement("span");
         state.textContent = mode.experimental
           ? "Experimentell"
-          : "Standard";
+          : mode.requires_library_source
+            ? "Stufe 2"
+            : "Standard";
 
         button.append(label, state);
         button.addEventListener("click", () => selectMode(mode.id));
         modePicker.appendChild(button);
+      }
+    }
+
+
+    function updateChainSourceCard() {
+      const mode = availableModes.find(item => item.id === currentMode);
+      const requiresLibrarySource = Boolean(mode?.requires_library_source);
+      const showSource = requiresLibrarySource && selectedLibrarySource;
+
+      chainSourceCard.hidden = !showSource;
+
+      if (showSource) {
+        chainSourceImage.src = selectedLibrarySource.image_url;
+        chainSourceTitle.textContent = selectedLibrarySource.title;
+      } else {
+        chainSourceImage.removeAttribute("src");
       }
     }
 
@@ -494,15 +565,64 @@
       modeDescription.textContent = mode.description || "";
 
       const requiresUpload = Boolean(mode.requires_upload);
+      const requiresLibrarySource = Boolean(mode.requires_library_source);
+      const isTextToImage = mode.id === "text_to_image";
 
       uploadCard.hidden = !requiresUpload;
       consentSection.hidden = !requiresUpload;
-      textToImageNotice.hidden = requiresUpload;
-      experimentSettings.hidden = requiresUpload;
-      mandatoryConstraints.hidden = requiresUpload;
-      runButton.textContent = requiresUpload
-        ? "Bild experimentell bearbeiten"
-        : "Bild generieren";
+      textToImageNotice.hidden = !isTextToImage;
+      experimentSettings.hidden = !isTextToImage;
+      mandatoryConstraints.hidden = !isTextToImage;
+      promptSections.hidden = !isTextToImage;
+      successPanel.hidden = !isTextToImage;
+      negativePromptField.hidden = !isTextToImage;
+
+      if (isTextToImage) {
+        modeBadge.textContent = "Strukturierter Zero-shot · Text-to-Image";
+        promptLabDescription.textContent = (
+          "Die Auswahlfelder werden serverseitig in sieben nachvollziehbare " +
+          "Promptabschnitte übersetzt. Marken- und Unternehmensnamen werden " +
+          "nicht in das Modellprompt übernommen."
+        );
+        frameworkTitle.textContent = "Strukturierter Gesamtprompt";
+        frameworkDescription.textContent = (
+          "Ein positiver Gesamtprompt mit klaren Abschnitten plus separater " +
+          "Negative Prompt – kein Bündel unverbundener Einzelprompts."
+        );
+      } else if (requiresLibrarySource) {
+        modeBadge.textContent = "Multimodales Prompt Chaining · Stufe 2";
+        promptLabDescription.textContent = (
+          "Die zweite Prompt-Stufe verbindet das bewusst gespeicherte " +
+          "synthetische Ausgangsbild mit einem gezielten Änderungsauftrag."
+        );
+        frameworkTitle.textContent = "Bearbeitungsprompt · Stufe 2";
+        frameworkDescription.textContent = (
+          "Der zweite Prompt übernimmt das gespeicherte synthetische Bild und " +
+          "beschreibt gezielt, was erhalten und was verändert werden soll."
+        );
+      } else {
+        modeBadge.textContent = "Experimentelles Image-to-Image";
+        promptLabDescription.textContent = (
+          "Die Auswahlfelder beschreiben die Bearbeitung eines berechtigt " +
+          "hochgeladenen realen Bildes."
+        );
+        frameworkTitle.textContent = "Experimenteller Bearbeitungsprompt";
+        frameworkDescription.textContent = (
+          "Dieser Prompt steuert die Bearbeitung eines berechtigt " +
+          "hochgeladenen realen Bildes."
+        );
+      }
+
+      if (requiresLibrarySource) {
+        runButton.textContent = "Gespeichertes Bild weiterbearbeiten";
+      } else if (requiresUpload) {
+        runButton.textContent = "Eigenes Bild experimentell bearbeiten";
+      } else {
+        runButton.textContent = "Bild generieren";
+      }
+
+      runButton.disabled = requiresLibrarySource && !selectedLibrarySource;
+      updateChainSourceCard();
 
       if (!requiresUpload) {
         resetSelectedFile();
@@ -524,6 +644,12 @@
       setProgress(0);
 
       await loadUiFields();
+
+      if (requiresLibrarySource && !selectedLibrarySource) {
+        setStatus(
+          "Bitte zuerst ein gespeichertes Bild aus der Kampagnenbibliothek auswählen."
+        );
+      }
     }
 
 
@@ -550,6 +676,16 @@
       availableModes = data.modes;
       renderModeButtons();
       await selectMode(data.default_mode || availableModes[0].id);
+
+      try {
+        await loadCampaignLibrary();
+      } catch (error) {
+        libraryItems = [];
+        renderCampaignLibrary();
+        setStatus(
+          `Die App ist bereit; die lokale Bibliothek konnte jedoch nicht geladen werden: ${error.message}`
+        );
+      }
     }
 
 
@@ -582,6 +718,316 @@
       }
 
       promptDebug.textContent = lines.join("\n");
+    }
+
+
+    // ------------------------------------------------------------
+    // Lokale Kampagnenbibliothek
+    // ------------------------------------------------------------
+
+    function formatSavedDate(value) {
+      const date = new Date(value);
+
+      if (Number.isNaN(date.getTime())) {
+        return "Zeitpunkt unbekannt";
+      }
+
+      return date.toLocaleString("de-DE", {
+        dateStyle: "short",
+        timeStyle: "short"
+      });
+    }
+
+
+    function makeSmallButton(label, className = "secondary-button") {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = className;
+      button.textContent = label;
+      return button;
+    }
+
+
+    async function loadCampaignLibrary() {
+      const response = await fetch(
+        `/api/library?t=${Date.now()}`,
+        {
+          method: "GET",
+          cache: "no-store"
+        }
+      );
+      const data = await readResponseData(response);
+
+      if (!response.ok) {
+        throw new Error(formatServerError(data, response.status));
+      }
+
+      libraryItems = Array.isArray(data?.items) ? data.items : [];
+
+      if (
+        selectedLibrarySource &&
+        !libraryItems.some(item => item.id === selectedLibrarySource.id)
+      ) {
+        selectedLibrarySource = null;
+        updateChainSourceCard();
+
+        if (currentMode === "prompt_chain") {
+          runButton.disabled = true;
+        }
+      }
+
+      renderCampaignLibrary();
+    }
+
+
+    function renderCampaignLibrary() {
+      libraryGallery.replaceChildren();
+      libraryEmpty.hidden = libraryItems.length > 0;
+
+      for (const item of libraryItems) {
+        const card = document.createElement("article");
+        card.className = "library-item";
+
+        const image = document.createElement("img");
+        image.src = `${item.thumbnail_url}?t=${Date.now()}`;
+        image.alt = item.title;
+
+        const body = document.createElement("div");
+        body.className = "library-item-body";
+
+        const title = document.createElement("strong");
+        title.textContent = item.title;
+
+        const meta = document.createElement("span");
+        meta.className = "library-meta";
+        const modeLabel = item.mode === "prompt_chain"
+          ? "Prompt Chain"
+          : item.mode === "image_to_image"
+            ? "Eigenes Bild bearbeitet"
+            : "Text-to-Image";
+        meta.textContent = [
+          modeLabel,
+          formatSavedDate(item.saved_at),
+          item.seed !== null && item.seed !== undefined
+            ? `Seed ${item.seed}`
+            : "zufälliger Seed"
+        ].join(" · ");
+
+        const actions = document.createElement("div");
+        actions.className = "item-actions";
+
+        const chainable = [
+          "text_to_image",
+          "prompt_chain"
+        ].includes(item.mode);
+
+        if (chainable) {
+          const continueButton = makeSmallButton(
+            "Weiterbearbeiten",
+            "primary-small-button"
+          );
+          continueButton.addEventListener("click", async () => {
+            selectedLibrarySource = item;
+            await selectMode("prompt_chain");
+            chainSourceCard.scrollIntoView({
+              behavior: "smooth",
+              block: "start"
+            });
+          });
+          actions.appendChild(continueButton);
+        }
+
+        const deleteButton = makeSmallButton("Löschen", "danger-button");
+        deleteButton.addEventListener("click", async () => {
+          const confirmed = window.confirm(
+            `„${item.title}“ dauerhaft aus der lokalen Bibliothek löschen?`
+          );
+
+          if (!confirmed) {
+            return;
+          }
+
+          const response = await fetch(
+            `/api/library/${encodeURIComponent(item.id)}`,
+            {
+              method: "DELETE",
+              cache: "no-store"
+            }
+          );
+          const data = await readResponseData(response);
+
+          if (!response.ok) {
+            alert(formatServerError(data, response.status));
+            return;
+          }
+
+          if (selectedLibrarySource?.id === item.id) {
+            selectedLibrarySource = null;
+            updateChainSourceCard();
+
+            if (currentMode === "prompt_chain") {
+              runButton.disabled = true;
+              setStatus(
+                "Das ausgewählte Ausgangsbild wurde gelöscht. Bitte ein anderes Bibliotheksbild auswählen."
+              );
+            }
+          }
+
+          await loadCampaignLibrary();
+        });
+        actions.appendChild(deleteButton);
+
+        const details = document.createElement("details");
+        details.className = "library-details";
+
+        const summary = document.createElement("summary");
+        summary.textContent = "Prompt und technische Daten";
+
+        const prompt = document.createElement("pre");
+        prompt.textContent = [
+          "POSITIVER PROMPT",
+          item.positive_prompt || "–",
+          "",
+          "NEGATIVE PROMPT",
+          item.negative_prompt || "–",
+          "",
+          `MODELL: ${item.model_name}`,
+          `FORMAT: ${item.width} × ${item.height}`
+        ].join("\n");
+
+        details.append(summary, prompt);
+        body.append(title, meta, actions, details);
+        card.append(image, body);
+        libraryGallery.appendChild(card);
+      }
+    }
+
+
+    async function saveGeneratedResult(result, saveButton) {
+      const defaultTitle = `Kampagnenmotiv ${new Date().toLocaleDateString("de-DE")}`;
+      const title = window.prompt(
+        "Name für die lokale Kampagnenbibliothek:",
+        defaultTitle
+      );
+
+      if (title === null) {
+        return;
+      }
+
+      saveButton.disabled = true;
+      saveButton.textContent = "Wird gespeichert …";
+
+      try {
+        const response = await fetch(
+          "/api/library/save",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            cache: "no-store",
+            body: JSON.stringify({
+              result_id: result.result_id,
+              title
+            })
+          }
+        );
+        const data = await readResponseData(response);
+
+        if (!response.ok) {
+          throw new Error(formatServerError(data, response.status));
+        }
+
+        saveButton.textContent = "Gespeichert";
+        result.saved = true;
+        result.library_item = data.item;
+
+        const state = saveButton
+          .closest(".gallery-item")
+          ?.querySelector(".result-state");
+
+        if (state) {
+          state.textContent = "Dauerhaft in der lokalen Bibliothek gespeichert";
+        }
+
+        await loadCampaignLibrary();
+        setStatus("Das Ergebnis wurde lokal in der Kampagnenbibliothek gespeichert.");
+      } catch (error) {
+        saveButton.disabled = false;
+        saveButton.textContent = "In Bibliothek speichern";
+        setStatus(`Speichern fehlgeschlagen: ${error.message}`);
+      }
+    }
+
+
+    async function discardGeneratedResult(result, card) {
+      const response = await fetch(
+        `/api/results/${encodeURIComponent(result.result_id)}`,
+        {
+          method: "DELETE",
+          cache: "no-store"
+        }
+      );
+      const data = await readResponseData(response);
+
+      if (!response.ok) {
+        throw new Error(formatServerError(data, response.status));
+      }
+
+      card.remove();
+      setStatus("Temporäres Ergebnis verworfen.");
+    }
+
+
+    function renderGeneratedResult(result) {
+      const item = document.createElement("article");
+      item.className = "gallery-item";
+
+      const image = document.createElement("img");
+      const separator = result.view_url.includes("?") ? "&" : "?";
+      image.src = `${result.view_url}${separator}t=${Date.now()}_${Math.random()}`;
+      image.alt = "Temporärer KI-Bildentwurf";
+
+      const resultState = document.createElement("div");
+      resultState.className = "result-state";
+      resultState.textContent = "Temporär · noch nicht gespeichert";
+
+      const actions = document.createElement("div");
+      actions.className = "item-actions result-actions";
+
+      const saveable = [
+        "text_to_image",
+        "prompt_chain"
+      ].includes(result.mode);
+
+      if (saveable) {
+        const saveButton = makeSmallButton(
+          "In Bibliothek speichern",
+          "primary-small-button"
+        );
+        saveButton.addEventListener("click", () => {
+          saveGeneratedResult(result, saveButton);
+        });
+        actions.appendChild(saveButton);
+      } else {
+        resultState.textContent = (
+          "Temporär · Ergebnisse mit realem Ausgangsbild werden nicht " +
+          "in der synthetischen Kampagnenbibliothek gespeichert"
+        );
+      }
+
+      const discardButton = makeSmallButton("Verwerfen", "danger-button");
+      discardButton.addEventListener("click", async () => {
+        try {
+          await discardGeneratedResult(result, item);
+        } catch (error) {
+          setStatus(`Verwerfen fehlgeschlagen: ${error.message}`);
+        }
+      });
+
+      actions.appendChild(discardButton);
+      item.append(image, resultState, actions);
+      gallery.appendChild(item);
     }
 
 
@@ -671,6 +1117,11 @@
         fixed_seed: Boolean(fixedSeedEnabled.checked),
         seed: Number.parseInt(fixedSeed.value, 10)
       };
+      components.sourceType = (
+        currentMode === "prompt_chain" && selectedLibrarySource
+      )
+        ? "generated_library"
+        : "external_upload";
 
       return components;
     }
@@ -712,9 +1163,13 @@
 
       const generation = data?.components?.generation || {};
 
-      seedSummary.textContent = generation.fixed_seed
-        ? `Vergleichs-Seed: ${generation.seed}`
-        : "Seed: zufällig";
+      if (generation.actual_seed !== undefined) {
+        seedSummary.textContent = `Verwendeter Seed: ${generation.actual_seed}`;
+      } else if (currentMode === "text_to_image" && generation.fixed_seed) {
+        seedSummary.textContent = `Vergleichs-Seed: ${generation.seed}`;
+      } else {
+        seedSummary.textContent = "Seed: zufällig";
+      }
     }
 
 
@@ -1038,6 +1493,30 @@
     });
 
 
+    clearChainSource.addEventListener("click", async () => {
+      selectedLibrarySource = null;
+      await selectMode("prompt_chain");
+      document.querySelector(".library-card")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+    });
+
+
+    refreshLibrary.addEventListener("click", async () => {
+      refreshLibrary.disabled = true;
+
+      try {
+        await loadCampaignLibrary();
+        setStatus("Kampagnenbibliothek aktualisiert.");
+      } catch (error) {
+        setStatus(`Bibliothek konnte nicht geladen werden: ${error.message}`);
+      } finally {
+        refreshLibrary.disabled = false;
+      }
+    });
+
+
     // ------------------------------------------------------------
     // Eingabe-Events
     // ------------------------------------------------------------
@@ -1168,6 +1647,12 @@
     runButton.addEventListener("click", async () => {
       const mode = availableModes.find(item => item.id === currentMode);
       const requiresUpload = Boolean(mode?.requires_upload);
+      const requiresLibrarySource = Boolean(mode?.requires_library_source);
+
+      if (requiresLibrarySource && !selectedLibrarySource) {
+        alert("Bitte zuerst ein Bild aus der Kampagnenbibliothek auswählen.");
+        return;
+      }
 
       if (requiresUpload && !selectedFile) {
         alert("Bitte zuerst ein Bild auswählen.");
@@ -1211,14 +1696,23 @@
       gallery.replaceChildren();
       setProgress(0);
       setStatus(
-        requiresUpload
-          ? "Upload und Bearbeitung werden vorbereitet ..."
-          : "Generierung wird vorbereitet ..."
+        requiresLibrarySource
+          ? "Zweite Stufe der Prompt Chain wird vorbereitet ..."
+          : requiresUpload
+            ? "Upload und experimentelle Bearbeitung werden vorbereitet ..."
+            : "Generierung wird vorbereitet ..."
       );
 
       const formData = new FormData();
 
       formData.append("mode", currentMode);
+
+      if (requiresLibrarySource && selectedLibrarySource) {
+        formData.append(
+          "library_source_id",
+          selectedLibrarySource.id
+        );
+      }
 
       if (requiresUpload && selectedFile) {
         formData.append(
@@ -1282,36 +1776,21 @@
           );
         }
 
-        const urls = Array.isArray(data?.view_urls)
-          ? data.view_urls
+        const results = Array.isArray(data?.results)
+          ? data.results
           : [];
 
         gallery.replaceChildren();
 
-        for (const url of urls) {
-          const item = document.createElement("div");
-          item.className = "gallery-item";
-
-          const image = document.createElement("img");
-
-          const separator = url.includes("?")
-            ? "&"
-            : "?";
-
-          image.src =
-            `${url}${separator}t=${Date.now()}_${Math.random()}`;
-
-          image.alt = "Ergebnis";
-
-          item.appendChild(image);
-          gallery.appendChild(item);
+        for (const result of results) {
+          renderGeneratedResult(result);
         }
 
         stopProgressPolling();
         setProgress(100);
 
         setStatus(
-          `Fertig. ${urls.length} Bild(er) erhalten.`
+          `Fertig. ${results.length} temporäre Bildvariante(n) erhalten.`
         );
 
       } catch (error) {
@@ -1334,7 +1813,7 @@
         );
 
       } finally {
-        runButton.disabled = false;
+        runButton.disabled = requiresLibrarySource && !selectedLibrarySource;
       }
     });
 

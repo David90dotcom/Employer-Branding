@@ -40,6 +40,34 @@ Die automatisch abgeleiteten Erfolgskriterien dienen als Prüfraster für die
 menschliche Bewertung. Sie sind keine automatische Qualitätsgarantie und
 ersetzen weder den Faktencheck noch die ethische und markenrechtliche Freigabe.
 
+## Lokale Kampagnenbibliothek und Prompt Chain
+
+Neue Ergebnisse sind zunächst temporär und werden nach der konfigurierten
+Aufbewahrungsdauer aus einem nicht öffentlich eingebundenen lokalen
+Datenbereich entfernt. Erst der ausdrückliche Button
+`In Bibliothek speichern` legt ein Motiv dauerhaft in der lokalen
+Kampagnenbibliothek ab. Gespeichert werden:
+
+- das gekennzeichnete Vorschaubild,
+- ein kleines Vorschaubild für die Bibliotheksansicht,
+- eine saubere interne Bearbeitungsquelle ohne eingebrannten Banner oder
+  `KI-generiert`-Overlay,
+- positiver Prompt und Negative Prompt,
+- Modus, Seed, Modellbezeichnung und Bildabmessungen,
+- bei verketteten Ergebnissen die Referenz auf das Ausgangsmotiv.
+
+Ein gespeichertes synthetisches Text-to-Image-Ergebnis kann über
+`Weiterbearbeiten` als zweite Stufe einer multimodalen Prompt Chain an den
+Qwen-Edit-Workflow übergeben werden. Die saubere Bearbeitungsquelle verhindert,
+dass der Transparenzhinweis oder ein zuvor eingefügter Banner Teil der nächsten
+Bildgenerierung wird.
+
+Die Kampagnenbibliothek liegt ausschließlich unter `webapp/data/` und wird von
+Git ignoriert. Sie wird daher weder committed noch nach GitHub hochgeladen.
+Ergebnisse aus dem experimentellen Uploadmodus für reale Personen werden nicht
+in der synthetischen Kampagnenbibliothek gespeichert. Sie bleiben temporär und
+können auch nicht als Ausgangsbilder der Prompt Chain verwendet werden.
+
 ## Standardmodell für Text-to-Image
 
 Die Konfiguration liegt in `webapp/model_config.json`. Voreingestellt ist:
