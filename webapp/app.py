@@ -70,6 +70,35 @@ progress_state = {
     "value": 0
 }
 
+TEXT_TO_IMAGE_SECTION_TITLES = {
+    "creative_direction": "CREATIVE ROLE / DIRECTION",
+    "task_goal": "TASK AND CAMPAIGN GOAL",
+    "context": "CONTEXT",
+    "visual_specification": "VISUAL SPECIFICATION",
+    "constraints": "CONSTRAINTS",
+    "output_format": "OUTPUT FORMAT",
+    "success_criteria": "SUCCESS CRITERIA"
+}
+
+OUTPUT_FORMATS = {
+    "1:1": "Photorealistic square 1:1 image for a social-media feed.",
+    "16:9": "Photorealistic 16:9 image for a careers website.",
+    "9:16": "Photorealistic vertical 9:16 image for a social-media story.",
+    "4:3": "Photorealistic horizontal 4:3 campaign image.",
+    "3:4": "Photorealistic vertical 3:4 campaign image."
+}
+
+TEXT_TO_IMAGE_NEGATIVE_PROMPT = (
+    "low resolution, low quality, distorted anatomy, malformed hands, "
+    "extra fingers, duplicated people, oversaturated colors, waxy skin, "
+    "artificial face, blurred details, chaotic composition, identifiable "
+    "real person, real employee likeness, generated text, watermark, company "
+    "logo, readable brand name, employee identification card, staged stock "
+    "photo pose, exaggerated enthusiasm, tokenism, stereotypical depiction, "
+    "discriminatory depiction, nudity, sexual content, pornography, violence, "
+    "blood, weapons, drugs, hate symbols, extremist symbols"
+)
+
 
 # ---------------------------------------------------------------------------
 # Grundfunktionen
@@ -218,6 +247,39 @@ def normalize_banner_settings(raw_components):
     }
 
 
+def normalize_generation_settings(raw_components):
+    raw_generation = raw_components.get("generation", {})
+
+    if not isinstance(raw_generation, dict):
+        raw_generation = {}
+
+    fixed_seed_value = raw_generation.get("fixed_seed", False)
+    fixed_seed = fixed_seed_value is True or str(
+        fixed_seed_value
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+    raw_seed = raw_generation.get("seed", 20260822)
+
+    try:
+        seed = int(raw_seed)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Seed must be an integer."
+        ) from exc
+
+    if seed < 0 or seed > 999_999_999_999_999:
+        raise HTTPException(
+            status_code=400,
+            detail="Seed must be between 0 and 999999999999999."
+        )
+
+    return {
+        "fixed_seed": fixed_seed,
+        "seed": seed
+    }
+
+
 def normalize_prompt_components(raw_components, mode=DEFAULT_MODE):
     """
     Nimmt die vom Browser gesendeten Werte entgegen,
@@ -255,6 +317,7 @@ def normalize_prompt_components(raw_components, mode=DEFAULT_MODE):
 
     normalized["extraPrompt"] = extra_prompt
     normalized["banner"] = normalize_banner_settings(raw_components)
+    normalized["generation"] = normalize_generation_settings(raw_components)
 
     if invalid_fields:
         raise HTTPException(
@@ -272,18 +335,233 @@ def normalize_prompt_components(raw_components, mode=DEFAULT_MODE):
 # Prompt bauen
 # ---------------------------------------------------------------------------
 
-def build_prompt_from_components(components, mode=DEFAULT_MODE):
-    """Build a validated prompt for either generation mode."""
-    normalized_mode = normalize_mode(mode)
+def ensure_sentence(value):
+    text = str(value or "").strip()
 
+    if text and text[-1] not in ".!?":
+        text += "."
+
+    return text
+
+
+def build_success_criteria(components):
+    criteria = [
+        {
+            "prompt": (
+                "The selected employer benefit and campaign goal must be "
+                "recognizable without relying on generated text."
+            ),
+            "label": (
+                "Kampagnenziel und Arbeitgebernutzen sind ohne generierten "
+                "Text erkennbar."
+            )
+        },
+        {
+            "prompt": (
+                "The workplace activity, collaboration, and responsibility "
+                "must be understandable at first glance."
+            ),
+            "label": (
+                "Tätigkeit, Zusammenarbeit und Verantwortung sind auf den "
+                "ersten Blick verständlich."
+            )
+        },
+        {
+            "prompt": (
+                "The scene must appear credible, respectful, and appropriate "
+                "for the defined target group."
+            ),
+            "label": (
+                "Die Szene wirkt glaubwürdig, respektvoll und passend für die "
+                "definierte Zielgruppe."
+            )
+        },
+        {
+            "prompt": (
+                "No identifiable real person, logo, readable brand name, "
+                "tokenism, or stereotypical depiction may appear."
+            ),
+            "label": (
+                "Keine identifizierbare reale Person, kein Logo, kein lesbarer "
+                "Markenname, kein Tokenismus und keine stereotype Darstellung."
+            )
+        }
+    ]
+
+    if components.get("banner", {}).get("enabled"):
+        criteria.append({
+            "prompt": (
+                "The requested negative space must remain calm, uncluttered, "
+                "and suitable for a separately added campaign headline."
+            ),
+            "label": (
+                "Die vorgesehene Freifläche bleibt ruhig und für eine separat "
+                "ergänzte Kampagnenheadline nutzbar."
+            )
+        })
+
+    return criteria
+
+
+def build_text_to_image_sections(components):
+    creative_direction = components.get("creativeDirection", "") or (
+        "Use the visual language of professional employer-branding campaign "
+        "photography with authentic documentary realism."
+    )
+
+    task_parts = [
+        components.get("campaignGoal", ""),
+        components.get("employerBenefit", "")
+    ]
+    task_text = " ".join(
+        ensure_sentence(part)
+        for part in task_parts
+        if part
+    ) or (
+        "Create a completely fictional recruiting image that communicates a "
+        "credible employer benefit."
+    )
+
+    context_parts = [
+        components.get("targetGroup", ""),
+        components.get("employerContext", ""),
+        components.get("competitorInsight", "")
+    ]
+    context_text = " ".join(
+        ensure_sentence(part)
+        for part in context_parts
+        if part
+    ) or (
+        "The image is intended for an early-career employer-branding campaign."
+    )
+
+    visual_parts = []
+
+    for field_id in ("personConcept", "workContext", "action"):
+        value = components.get(field_id, "")
+
+        if value:
+            visual_parts.append(ensure_sentence(value))
+
+    pose = components.get("pose", "")
+
+    if pose:
+        visual_parts.append(
+            ensure_sentence("The main person is " + pose)
+        )
+
+    expression = components.get("expression", "")
+    gaze = components.get("gaze", "")
+    face_parts = []
+
+    if expression:
+        face_parts.append("has " + expression)
+
+    if gaze:
+        face_parts.append("is " + gaze)
+
+    if face_parts:
+        visual_parts.append(
+            "The main person " + "; ".join(face_parts) + "."
+        )
+
+    outfit = components.get("outfit", "")
+
+    if outfit:
+        visual_parts.append(
+            ensure_sentence("The main person is " + outfit)
+        )
+
+    visual_style_parts = [
+        components.get(field_id, "")
+        for field_id in (
+            "framing",
+            "cameraAngle",
+            "lighting",
+            "imageEffect"
+        )
+        if components.get(field_id, "")
+    ]
+
+    if visual_style_parts:
+        visual_parts.append(
+            ensure_sentence(
+                "Use " + ", ".join(visual_style_parts)
+            )
+        )
+
+    extra_prompt = components.get("extraPrompt", "")
+
+    if extra_prompt:
+        visual_parts.append(
+            ensure_sentence("Additional requested detail: " + extra_prompt)
+        )
+
+    visual_text = " ".join(visual_parts) or (
+        "Show a credible fictional young adult participating in a concrete "
+        "workplace task with natural body language and realistic work objects."
+    )
+
+    constraints_text = (
+        "Do not imitate or depict any identifiable real person. Do not present "
+        "fictional people as real employees or testimonials. No company logos, "
+        "readable brand names, employee identification cards, exaggerated "
+        "enthusiasm, tokenism, discriminatory content, or stereotypical "
+        "depiction. Human review is required before publication."
+    )
+
+    aspect_ratio = components.get("aspectRatio", "16:9") or "16:9"
+    output_parts = [
+        OUTPUT_FORMATS.get(aspect_ratio, OUTPUT_FORMATS["16:9"])
+    ]
+    banner = components.get("banner", {})
+
+    if banner.get("enabled"):
+        banner_position = banner.get("position", "auto")
+
+        if banner_position == "auto":
+            banner_position = "bottom"
+
+        output_parts.append(
+            "Leave clean negative space on the " + banner_position +
+            " side of the image for a separately added campaign headline; "
+            "keep this area calm and free of generated typography."
+        )
+
+    output_text = " ".join(output_parts)
+    success_criteria = build_success_criteria(components)
+    success_text = " ".join(
+        f"{index}. {criterion['prompt']}"
+        for index, criterion in enumerate(success_criteria, start=1)
+    )
+
+    section_values = [
+        ("creative_direction", ensure_sentence(creative_direction)),
+        ("task_goal", task_text),
+        ("context", context_text),
+        ("visual_specification", visual_text),
+        ("constraints", constraints_text),
+        ("output_format", output_text),
+        ("success_criteria", success_text)
+    ]
+
+    return [
+        {
+            "id": section_id,
+            "title": TEXT_TO_IMAGE_SECTION_TITLES[section_id],
+            "text": text
+        }
+        for section_id, text in section_values
+    ]
+
+
+def build_image_to_image_prompt(components):
     person_concept = components.get("personConcept", "")
-    work_context = components.get("workContext", "")
+    work_context = components.get("workContext", "") or components.get(
+        "brandTone",
+        ""
+    )
     image_effect = components.get("imageEffect", "")
-
-    # The legacy field is kept for the unchanged Image-to-Image UI.
-    if normalized_mode == "image_to_image" and not work_context:
-        work_context = components.get("brandTone", "")
-
     action = components.get("action", "")
     expression = components.get("expression", "")
     outfit = components.get("outfit", "")
@@ -314,21 +592,11 @@ def build_prompt_from_components(components, mode=DEFAULT_MODE):
     if not selected_anything:
         return ""
 
-    blocks = []
-
-    if normalized_mode == "text_to_image":
-        blocks.append(
-            "Create a completely fictional, photorealistic professional "
-            "employer-branding campaign image. Every depicted person is a "
-            "synthetic character and must not imitate or depict a real "
-            "identifiable individual."
-        )
-    else:
-        blocks.append(
-            "Preserve the uploaded person's identity, face structure, age, "
-            "hairstyle, skin tone, natural body proportions, and recognizable "
-            "appearance."
-        )
+    blocks = [
+        "Preserve the uploaded person's identity, face structure, age, "
+        "hairstyle, skin tone, natural body proportions, and recognizable "
+        "appearance."
+    ]
 
     if person_concept:
         blocks.append("Main subject: " + person_concept)
@@ -351,15 +619,9 @@ def build_prompt_from_components(components, mode=DEFAULT_MODE):
         face_parts.append("is " + gaze)
 
     if face_parts:
-        face_block = "Face and gaze: the main person " + "; ".join(face_parts) + "."
-
-        if gaze:
-            face_block += (
-                " The head direction and both eyes must clearly follow this "
-                "gaze instruction."
-            )
-
-        blocks.append(face_block)
+        blocks.append(
+            "Face and gaze: the main person " + "; ".join(face_parts) + "."
+        )
 
     if outfit:
         blocks.append("Clothing: the main person is " + outfit + ".")
@@ -377,78 +639,42 @@ def build_prompt_from_components(components, mode=DEFAULT_MODE):
             "."
         )
 
-    if banner.get("enabled"):
-        banner_position = banner.get("position", "auto")
-
-        if banner_position == "auto":
-            banner_position = "bottom"
-
-        if banner_position == "right":
-            blocks.append(
-                "Leave clean negative space on the right side of the image, "
-                "with a calm background and no generated words, letters, "
-                "logos, signs, labels, or typography."
-            )
-        elif banner_position == "top":
-            blocks.append(
-                "Leave clean negative space at the top of the image, with a "
-                "calm background and no generated words, letters, logos, "
-                "signs, labels, or typography."
-            )
-        else:
-            blocks.append(
-                "Leave clean negative space at the bottom of the image, with "
-                "a calm background and no generated words, letters, logos, "
-                "signs, labels, or typography."
-            )
-
     if extra_prompt:
-        normalized_extra = extra_prompt.strip()
-
-        if normalized_extra[-1] not in ".!?":
-            normalized_extra += "."
-
-        blocks.append(normalized_extra)
-
-    priority_details = [
-        part
-        for part in (
-            person_concept,
-            work_context,
-            action,
-            pose,
-            gaze,
-            expression,
-            outfit,
-            camera_angle,
-            framing,
-            lighting,
-            image_effect
-        )
-        if part
-    ]
-
-    if banner.get("enabled"):
-        priority_details.append(
-            "simple uncluttered background space with no generated text"
-        )
-
-    if priority_details:
-        blocks.append(
-            "Priority details to follow clearly: " +
-            "; ".join(priority_details) +
-            "."
-        )
-
-    if normalized_mode == "text_to_image":
-        blocks.append(
-            "Do not generate company logos, readable brand names, employee "
-            "identification cards, or claims that the fictional people are "
-            "real employees. Avoid degrading, discriminatory, or stereotypical "
-            "depictions."
-        )
+        blocks.append(ensure_sentence(extra_prompt))
 
     return "\n\n".join(blocks).strip()
+
+
+def build_prompt_package(components, mode=DEFAULT_MODE):
+    normalized_mode = normalize_mode(mode)
+
+    if normalized_mode == "text_to_image":
+        sections = build_text_to_image_sections(components)
+        positive_prompt = "\n\n".join(
+            section["title"] + "\n" + section["text"]
+            for section in sections
+        )
+
+        return {
+            "positive_prompt": positive_prompt.strip(),
+            "negative_prompt": TEXT_TO_IMAGE_NEGATIVE_PROMPT,
+            "sections": sections,
+            "success_criteria": build_success_criteria(components)
+        }
+
+    positive_prompt = build_image_to_image_prompt(components)
+
+    return {
+        "positive_prompt": positive_prompt,
+        "negative_prompt": "",
+        "sections": [],
+        "success_criteria": []
+    }
+
+
+def build_prompt_from_components(components, mode=DEFAULT_MODE):
+    """Backward-compatible accessor for the positive model prompt."""
+    return build_prompt_package(components, mode)["positive_prompt"]
 
 
 # ---------------------------------------------------------------------------
@@ -1101,7 +1327,13 @@ def wait_for_result(prompt_id):
         time.sleep(0.4)
 
 
-def patch_text_to_image_workflow(workflow, prompt, components, mode_config):
+def patch_text_to_image_workflow(
+    workflow,
+    prompt,
+    negative_prompt,
+    components,
+    mode_config
+):
     nodes = mode_config["nodes"]
     model = mode_config["model"]
     generation = mode_config["generation"]
@@ -1110,6 +1342,7 @@ def patch_text_to_image_workflow(workflow, prompt, components, mode_config):
     clip_loader = workflow[nodes["clip_loader"]]["inputs"]
     vae_loader = workflow[nodes["vae_loader"]]["inputs"]
     positive = workflow[nodes["positive_prompt"]]["inputs"]
+    negative = workflow[nodes["negative_prompt"]]["inputs"]
     latent = workflow[nodes["latent_image"]]["inputs"]
     sampler = workflow[nodes["sampler"]]["inputs"]
 
@@ -1117,6 +1350,7 @@ def patch_text_to_image_workflow(workflow, prompt, components, mode_config):
     clip_loader["clip_name"] = model["clip_name"]
     vae_loader["vae_name"] = model["vae_name"]
     positive["text"] = prompt
+    negative["text"] = negative_prompt or TEXT_TO_IMAGE_NEGATIVE_PROMPT
 
     aspect_ratio = components.get(
         "aspectRatio",
@@ -1132,7 +1366,12 @@ def patch_text_to_image_workflow(workflow, prompt, components, mode_config):
 
     latent["width"] = int(dimensions[0])
     latent["height"] = int(dimensions[1])
-    sampler["seed"] = uuid.uuid4().int % 1_000_000_000_000_000
+    generation_settings = components.get("generation", {})
+
+    if generation_settings.get("fixed_seed"):
+        sampler["seed"] = int(generation_settings["seed"])
+    else:
+        sampler["seed"] = uuid.uuid4().int % 1_000_000_000_000_000
     sampler["steps"] = int(generation.get("steps", 50))
     sampler["cfg"] = float(generation.get("cfg", 4.0))
     sampler["sampler_name"] = generation.get("sampler_name", "euler")
@@ -1157,7 +1396,8 @@ def patch_workflow(
     mode,
     prompt,
     components,
-    image_name=None
+    image_name=None,
+    negative_prompt=""
 ):
     normalized_mode = normalize_mode(mode)
 
@@ -1165,6 +1405,7 @@ def patch_workflow(
         return patch_text_to_image_workflow(
             workflow,
             prompt,
+            negative_prompt,
             components,
             get_mode_config(normalized_mode)
         )
@@ -1280,12 +1521,16 @@ async def preview_prompt(payload: dict = Body(...)):
     raw_components = payload.get("components", payload)
 
     components = normalize_prompt_components(raw_components, mode)
-    prompt = build_prompt_from_components(components, mode)
+    prompt_package = build_prompt_package(components, mode)
 
     return JSONResponse(
         content={
             "mode": mode,
-            "prompt": prompt,
+            "prompt": prompt_package["positive_prompt"],
+            "positive_prompt": prompt_package["positive_prompt"],
+            "negative_prompt": prompt_package["negative_prompt"],
+            "sections": prompt_package["sections"],
+            "success_criteria": prompt_package["success_criteria"],
             "components": components
         },
         headers=no_cache_headers()
@@ -1314,10 +1559,12 @@ async def run(
         raw_components,
         normalized_mode
     )
-    final_prompt = build_prompt_from_components(
+    prompt_package = build_prompt_package(
         components,
         normalized_mode
     )
+    final_prompt = prompt_package["positive_prompt"]
+    negative_prompt = prompt_package["negative_prompt"]
 
     if not final_prompt:
         raise HTTPException(
@@ -1369,7 +1616,8 @@ async def run(
         mode=normalized_mode,
         prompt=final_prompt,
         components=components,
-        image_name=stored_image_name
+        image_name=stored_image_name,
+        negative_prompt=negative_prompt
     )
 
     progress_state["value"] = 0
@@ -1425,6 +1673,9 @@ async def run(
             "mode": normalized_mode,
             "prompt_id": prompt_id,
             "submitted_prompt": final_prompt,
+            "submitted_negative_prompt": negative_prompt,
+            "prompt_sections": prompt_package["sections"],
+            "success_criteria": prompt_package["success_criteria"],
             "prompt_components": components,
             "view_urls": view_urls
         },

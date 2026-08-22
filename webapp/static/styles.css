@@ -212,7 +212,10 @@ label {
 
 select,
 button,
-textarea {
+textarea,
+input[type="text"],
+input[type="number"],
+input[type="color"] {
   width: 100%;
   padding: 11px 12px;
   font-size: 14px;
@@ -225,12 +228,16 @@ textarea {
 }
 
 select:hover,
-textarea:hover {
+textarea:hover,
+input[type="text"]:hover,
+input[type="number"]:hover {
   border-color: #bdd0e4;
 }
 
 select:focus,
-textarea:focus {
+textarea:focus,
+input[type="text"]:focus,
+input[type="number"]:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 4px rgba(63, 111, 217, 0.12);
 }
@@ -242,6 +249,212 @@ textarea {
 }
 
 textarea[readonly] {
+  background: var(--panel-2);
+}
+
+input[type="checkbox"] {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+.prompt-lab-heading h3 {
+  margin: 0;
+}
+
+.prompt-form-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.form-section {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel-2);
+}
+
+.form-section-heading h4 {
+  margin: 0;
+  color: #244f9f;
+  font-size: 17px;
+}
+
+.form-section-heading p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.form-section .grid {
+  margin-top: 14px;
+}
+
+.constraint-panel {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid #bcdccc;
+  border-radius: 14px;
+  background: #f2fbf6;
+}
+
+.constraint-panel > div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.constraint-panel strong {
+  color: #206e51;
+}
+
+.constraint-panel span,
+.field-help {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.constraint-panel ul,
+.success-panel ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: #466358;
+  line-height: 1.55;
+}
+
+.experiment-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 18px;
+  align-items: end;
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid #c9d9f2;
+  border-radius: 14px;
+  background: #f4f7ff;
+}
+
+.seed-field input:disabled {
+  color: #7a8796;
+  background: #e9eef5;
+}
+
+.framework-output {
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 2px solid var(--border);
+}
+
+.framework-output-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.framework-output-heading h3 {
+  margin: 0;
+}
+
+.framework-output-heading p {
+  margin: 5px 0 0;
+  max-width: 740px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.seed-summary {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid #cad9fb;
+  border-radius: 999px;
+  color: #2f57aa;
+  background: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.prompt-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.prompt-section {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.32fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+  padding: 12px 14px;
+  border-left: 4px solid var(--accent);
+  background: #f7fafd;
+}
+
+.prompt-section strong {
+  color: #244f9f;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.prompt-section p {
+  margin: 0;
+  color: #3e4c5e;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.prompt-output-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+#finalPrompt {
+  min-height: 330px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+}
+
+#negativePrompt {
+  min-height: 150px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+}
+
+.success-panel {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid #d8e2ee;
+  border-radius: 14px;
+  background: #fbfcfe;
+}
+
+.success-panel ul {
+  color: #3e4c5e;
+}
+
+.technical-details {
+  margin-top: 14px;
+  color: var(--muted);
+}
+
+.technical-details summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.technical-details pre {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: #344253;
   background: var(--panel-2);
 }
 
@@ -343,6 +556,15 @@ button:disabled {
 
   .mode-picker {
     grid-template-columns: 1fr;
+  }
+
+  .experiment-panel,
+  .prompt-section {
+    grid-template-columns: 1fr;
+  }
+
+  .framework-output-heading {
+    flex-direction: column;
   }
 
   .topbar {

@@ -34,6 +34,7 @@
         "clip_loader": "2",
         "vae_loader": "3",
         "positive_prompt": "4",
+        "negative_prompt": "5",
         "latent_image": "7",
         "sampler": "8"
       }

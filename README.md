@@ -9,6 +9,37 @@ Lokaler Prototyp zur standardisierten Erstellung von Employer-Branding-Bildmotiv
 
 Beide Modi verwenden dieselbe serverseitige Prompt-Erzeugung, Ergebnisanzeige, optionale Kampagnen-Banner und den Hinweis `KI-generiert`.
 
+## Prompt Engineering Lab
+
+Der Text-to-Image-Modus übersetzt ein deutschsprachiges Kampagnenbriefing in
+einen englischen, modular aufgebauten Gesamtprompt. Die Struktur ist in der
+Oberfläche und in der Serverantwort sichtbar:
+
+1. `CREATIVE ROLE / DIRECTION`
+2. `TASK AND CAMPAIGN GOAL`
+3. `CONTEXT`
+4. `VISUAL SPECIFICATION`
+5. `CONSTRAINTS`
+6. `OUTPUT FORMAT`
+7. `SUCCESS CRITERIA`
+
+Die Auswahlfelder decken Kampagnenziel, Zielgruppe, Branchenkontext,
+Arbeitgebernutzen, einen Impuls aus dem Wettbewerbsvergleich sowie die
+beobachtbare Bildgestaltung ab. Reale Unternehmens- und Markennamen werden
+nicht in das Modellprompt übernommen. Verbindliche ethische und markenbezogene
+Leitplanken werden zusätzlich als separater Negative Prompt an den
+Text-to-Image-Workflow übergeben.
+
+Die Anwendung erzeugt dabei keinen technischen „Multi-Prompt“, sondern einen
+strukturierten positiven Gesamtprompt und einen zugehörigen Negative Prompt.
+Für kontrollierte Vergleiche kann ein fester Seed verwendet werden. Werden
+Promptvarianten verglichen, sollten Modell, Seed, Seitenverhältnis, Schritte,
+CFG, Sampler und Scheduler unverändert bleiben.
+
+Die automatisch abgeleiteten Erfolgskriterien dienen als Prüfraster für die
+menschliche Bewertung. Sie sind keine automatische Qualitätsgarantie und
+ersetzen weder den Faktencheck noch die ethische und markenrechtliche Freigabe.
+
 ## Standardmodell für Text-to-Image
 
 Die Konfiguration liegt in `webapp/model_config.json`. Voreingestellt ist:

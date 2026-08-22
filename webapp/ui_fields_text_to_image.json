@@ -1,5 +1,169 @@
 [
   {
+    "id": "creativeDirection",
+    "label": "Gestalterische Perspektive",
+    "type": "select",
+    "options": [
+      {
+        "label": "Bitte auswählen",
+        "value": ""
+      },
+      {
+        "label": "Authentische Employer-Branding-Reportage",
+        "value": "Use the visual language of professional employer-branding campaign photography with authentic documentary realism.",
+        "default": true
+      },
+      {
+        "label": "Klar und professionell",
+        "value": "Use the visual language of clear, professional employer-branding campaign photography with restrained corporate aesthetics."
+      },
+      {
+        "label": "Warm und nahbar",
+        "value": "Use the visual language of warm, approachable editorial employer-branding photography with natural human moments."
+      },
+      {
+        "label": "Jung und dynamisch",
+        "value": "Use the visual language of modern early-career campaign photography with credible energy and documentary movement."
+      }
+    ]
+  },
+  {
+    "id": "campaignGoal",
+    "label": "Aufgabe / Kampagnenziel",
+    "type": "select",
+    "options": [
+      {
+        "label": "Bitte auswählen",
+        "value": ""
+      },
+      {
+        "label": "Duales Studium sichtbar machen",
+        "value": "Create a completely fictional recruiting image for a dual-study campaign.",
+        "default": true
+      },
+      {
+        "label": "Berufseinstieg attraktiv erklären",
+        "value": "Create a completely fictional recruiting image for an early-career campaign."
+      },
+      {
+        "label": "Ausbildung in Logistik zeigen",
+        "value": "Create a completely fictional recruiting image for an apprenticeship campaign in retail logistics."
+      },
+      {
+        "label": "Digitalen Fachbereich positionieren",
+        "value": "Create a completely fictional recruiting image for an entry-level digital and administrative career campaign."
+      }
+    ]
+  },
+  {
+    "id": "targetGroup",
+    "label": "Zielgruppe",
+    "type": "select",
+    "options": [
+      {
+        "label": "Bitte auswählen",
+        "value": ""
+      },
+      {
+        "label": "Schulabgänger:innen in NRW",
+        "value": "The target group consists of school graduates in North Rhine-Westphalia who are considering practical career and study options.",
+        "default": true
+      },
+      {
+        "label": "Interessierte am dualen Studium",
+        "value": "The target group consists of prospective dual-study applicants who value practical learning and academic development."
+      },
+      {
+        "label": "Berufseinsteiger:innen",
+        "value": "The target group consists of young adults at the beginning of their professional careers."
+      },
+      {
+        "label": "Quereinsteiger:innen",
+        "value": "The target group consists of career changers looking for a structured and credible entry into retail work."
+      }
+    ]
+  },
+  {
+    "id": "employerContext",
+    "label": "Unternehmens- und Branchenkontext",
+    "type": "select",
+    "options": [
+      {
+        "label": "Bitte auswählen",
+        "value": ""
+      },
+      {
+        "label": "Lebensmitteleinzelhandel in NRW",
+        "value": "The campaign represents a modern food-retail employer in North Rhine-Westphalia without displaying a real company identity.",
+        "default": true
+      },
+      {
+        "label": "Handelslogistik",
+        "value": "The campaign represents a modern retail-logistics employer without displaying a real company identity."
+      },
+      {
+        "label": "Verwaltung und digitale Fachbereiche",
+        "value": "The campaign represents the administrative and digital functions of a modern retail employer without displaying a real company identity."
+      },
+      {
+        "label": "Filiale, Logistik und Verwaltung",
+        "value": "The campaign represents a multi-site retail employer with store, logistics, and administrative career paths without displaying a real company identity."
+      }
+    ]
+  },
+  {
+    "id": "employerBenefit",
+    "label": "Zentraler Arbeitgebernutzen",
+    "type": "select",
+    "options": [
+      {
+        "label": "Bitte auswählen",
+        "value": ""
+      },
+      {
+        "label": "Praxis, Verantwortung und Teamarbeit",
+        "value": "Communicate that practical learning, early responsibility, and teamwork are central employer benefits.",
+        "default": true
+      },
+      {
+        "label": "Entwicklung und Perspektive",
+        "value": "Communicate structured development, credible learning opportunities, and long-term career perspectives."
+      },
+      {
+        "label": "Digitalisierung und Mitgestaltung",
+        "value": "Communicate digital collaboration, problem solving, and the opportunity to contribute ideas early."
+      },
+      {
+        "label": "Regionalität und Verlässlichkeit",
+        "value": "Communicate regional connection, reliable collaboration, and a structured entry into working life."
+      }
+    ]
+  },
+  {
+    "id": "competitorInsight",
+    "label": "Erkenntnis aus dem Wettbewerbsvergleich",
+    "type": "select",
+    "options": [
+      {
+        "label": "Keine Vergleichserkenntnis",
+        "value": ""
+      },
+      {
+        "label": "Konkrete Tätigkeit statt gestelltem Porträt",
+        "value": "Differentiate the concept from generic posed recruiting portraits by making a concrete workplace activity immediately visible.",
+        "default": true
+      },
+      {
+        "label": "Belegbare Szene statt austauschbarer Aussage",
+        "value": "Differentiate the concept from interchangeable employer claims by showing observable workplace behavior and credible work objects."
+      },
+      {
+        "label": "Lernweg statt unklarer Karrierebotschaft",
+        "value": "Differentiate the concept by making practical learning and the next development step visually understandable."
+      }
+    ]
+  },
+  {
     "id": "workContext",
     "label": "Praxiswelt / Tätigkeit",
     "type": "select",
@@ -10,7 +174,8 @@
       },
       {
         "label": "Filiale / Lebensmitteleinzelhandel",
-        "value": "A realistic modern food-retail store during normal operations. The main person coordinates a clearly visible task involving shelves, products, a tablet, or a short team briefing. The store is organized, credible, and free of readable brand names or company logos."
+        "value": "A realistic modern food-retail store during normal operations. The main person coordinates a clearly visible task involving shelves, products, a tablet, or a short team briefing. The store is organized, credible, and free of readable brand names or company logos.",
+        "default": true
       },
       {
         "label": "Logistikzentrum / Warenfluss",
@@ -45,7 +210,8 @@
       },
       {
         "label": "Eine Person im dualen Studium",
-        "value": "One fictional young adult in a dual-study context is the clear main subject. The portrayal communicates curiosity, growing responsibility, and practical learning without presenting the person as a real employee."
+        "value": "One fictional young adult in a dual-study context is the clear main subject. The portrayal communicates curiosity, growing responsibility, and practical learning without presenting the person as a real employee.",
+        "default": true
       },
       {
         "label": "Zwei gleichwertige Personen",
@@ -76,7 +242,8 @@
       },
       {
         "label": "Praktische Anleitung",
-        "value": "A concrete learning moment is visible: one person explains a work step while the other follows the same object, process, or document."
+        "value": "A concrete learning moment is visible: one person explains a work step while the other follows the same object, process, or document.",
+        "default": true
       },
       {
         "label": "Team bespricht eine Aufgabe",
@@ -107,7 +274,8 @@
       },
       {
         "label": "Konzentriert",
-        "value": "a focused expression directed toward the visible task"
+        "value": "a focused expression directed toward the visible task",
+        "default": true
       },
       {
         "label": "Motiviert",
@@ -138,7 +306,8 @@
       },
       {
         "label": "Moderner Arbeitslook",
-        "value": "wearing a clean overshirt, plain shirt, dark trousers, and practical shoes suitable for the visible workplace"
+        "value": "wearing a clean overshirt, plain shirt, dark trousers, and practical shoes suitable for the visible workplace",
+        "default": true
       },
       {
         "label": "Tech-casual",
@@ -161,7 +330,8 @@
       },
       {
         "label": "Halbkörper",
-        "value": "a medium shot showing the main person from head to waist and enough workplace context to understand the task"
+        "value": "a medium shot showing the main person from head to waist and enough workplace context to understand the task",
+        "default": true
       },
       {
         "label": "Dreiviertelkörper",
@@ -196,7 +366,8 @@
       },
       {
         "label": "Aktiv bei der Tätigkeit",
-        "value": "actively performing the visible workplace task with anatomically plausible hand placement"
+        "value": "actively performing the visible workplace task with anatomically plausible hand placement",
+        "default": true
       },
       {
         "label": "Im Gehen",
@@ -219,7 +390,8 @@
       },
       {
         "label": "Blick auf die Tätigkeit",
-        "value": "looking naturally at the document, screen, product, tool, package, or work object used in the scene"
+        "value": "looking naturally at the document, screen, product, tool, package, or work object used in the scene",
+        "default": true
       },
       {
         "label": "Blick zur anderen Person",
@@ -242,7 +414,8 @@
       },
       {
         "label": "Auf Augenhöhe",
-        "value": "an eye-level camera perspective with natural proportions"
+        "value": "an eye-level camera perspective with natural proportions",
+        "default": true
       },
       {
         "label": "Frontansicht",
@@ -269,7 +442,8 @@
       },
       {
         "label": "Natürliches Tageslicht",
-        "value": "soft natural daylight with gentle shadows and realistic skin tones"
+        "value": "soft natural daylight with gentle shadows and realistic skin tones",
+        "default": true
       },
       {
         "label": "Helles Arbeitslicht",
@@ -296,7 +470,8 @@
       },
       {
         "label": "Authentisch und nahbar",
-        "value": "authentic, approachable employer-brand photography with natural colors and credible workplace detail"
+        "value": "authentic, approachable employer-brand photography with natural colors and credible workplace detail",
+        "default": true
       },
       {
         "label": "Modern und dynamisch",
@@ -323,7 +498,8 @@
       },
       {
         "label": "Querformat 16:9 – Website",
-        "value": "16:9"
+        "value": "16:9",
+        "default": true
       },
       {
         "label": "Hochformat 9:16 – Story",

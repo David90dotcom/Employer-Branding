@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <title>Employer Branding Image Studio</title>
+  <title>Employer Branding Prompt Lab</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
@@ -11,13 +11,13 @@
 
   <div class="topbar">
     <div>
-      <h2>Employer Branding Image Studio</h2>
+      <h2>Employer Branding Prompt Lab</h2>
       <div class="subtitle">
-        Lokale KI-Bildgenerierung mit standardisierter Prompt-Erzeugung und menschlicher Freigabe
+        Vom Kampagnenbriefing zum strukturierten Bildprompt – lokal generiert und menschlich geprüft
       </div>
     </div>
 
-    <div class="badge">Text-to-Image standardmäßig</div>
+    <div class="badge">Strukturierter Zero-shot · Text-to-Image</div>
   </div>
 
   <div class="stack">
@@ -62,19 +62,68 @@
       >
     </div>
 
-    <div class="card">
+    <div class="card prompt-lab-card">
 
-      <div id="fieldsGrid" class="grid"></div>
+      <div class="section-heading prompt-lab-heading">
+        <div>
+          <h3>Prompt-Aufbau</h3>
+          <p class="mode-description">
+            Die Auswahlfelder werden serverseitig in sieben nachvollziehbare
+            Promptabschnitte übersetzt. Marken- und Unternehmensnamen werden
+            nicht in das Modellprompt übernommen.
+          </p>
+        </div>
+      </div>
+
+      <div id="fieldsGrid" class="prompt-form-sections"></div>
 
       <div class="field" style="margin-top: 18px;">
         <label for="extraPrompt">
-          Zusätzlicher Freitext-Prompt
+          Zusätzliche visuelle Details (optional)
         </label>
 
         <textarea
           id="extraPrompt"
-          placeholder="Optional: weitere Details ergänzen, z. B. accessories, mood, background details ..."
+          placeholder="Optional: weitere beobachtbare Bilddetails ergänzen, ohne reale Namen oder vertrauliche Angaben ..."
         ></textarea>
+      </div>
+
+      <div id="mandatoryConstraints" class="constraint-panel">
+        <div>
+          <strong>Verbindliche Leitplanken</strong>
+          <span>werden immer in Prompt und Negative Prompt übernommen</span>
+        </div>
+        <ul>
+          <li>keine identifizierbare reale Person oder vorgetäuschte Beschäftigtenaussage</li>
+          <li>keine Logos, lesbaren Markennamen oder Mitarbeiterausweise</li>
+          <li>kein Tokenismus, keine diskriminierende oder stereotype Darstellung</li>
+          <li>menschliche Prüfung vor einer Veröffentlichung</li>
+        </ul>
+      </div>
+
+      <div id="experimentSettings" class="experiment-panel">
+        <div class="field">
+          <label style="display:flex; gap:10px; align-items:center;">
+            <input id="fixedSeedEnabled" type="checkbox" checked>
+            Fixierten Seed für einen kontrollierten Promptvergleich verwenden
+          </label>
+          <span class="field-help">
+            Gleiches Modell, gleicher Seed und gleiche Parameter machen
+            Unterschiede zwischen Promptvarianten besser vergleichbar.
+          </span>
+        </div>
+
+        <div class="field seed-field">
+          <label for="fixedSeed">Seed</label>
+          <input
+            id="fixedSeed"
+            type="number"
+            min="0"
+            max="999999999999999"
+            step="1"
+            value="20260822"
+          >
+        </div>
       </div>
 
       <div class="field" style="margin-top: 18px;">
@@ -181,26 +230,56 @@
         </div>
       </div>
 
-      <div class="field" style="margin-top: 18px;">
-        <label for="finalPrompt">
-          Finaler Server-Prompt
-        </label>
+      <div id="frameworkOutput" class="framework-output">
+        <div class="framework-output-heading">
+          <div>
+            <h3>Strukturierter Gesamtprompt</h3>
+            <p>
+              Ein positiver Gesamtprompt mit klaren Abschnitten plus separater
+              Negative Prompt – kein Bündel unverbundener Einzelprompts.
+            </p>
+          </div>
+          <div id="seedSummary" class="seed-summary"></div>
+        </div>
 
-        <textarea
-          id="finalPrompt"
-          readonly
-        ></textarea>
-      </div>
+        <div id="promptSections" class="prompt-sections"></div>
 
-      <div class="field" style="margin-top: 18px;">
-        <label>
-          Diagnose: gesendete Prompt-Komponenten
-        </label>
+        <div class="prompt-output-grid">
+          <div class="field">
+            <label for="finalPrompt">
+              Positiver Modellprompt
+            </label>
 
-        <pre
-          id="promptDebug"
-          style="white-space: pre-wrap; overflow:auto; max-height: 260px;"
-        ></pre>
+            <textarea
+              id="finalPrompt"
+              readonly
+            ></textarea>
+          </div>
+
+          <div class="field">
+            <label for="negativePrompt">
+              Negative Prompt
+            </label>
+
+            <textarea
+              id="negativePrompt"
+              readonly
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="success-panel">
+          <strong>Automatisch abgeleitete Erfolgskriterien</strong>
+          <ul id="successCriteria"></ul>
+        </div>
+
+        <details class="technical-details">
+          <summary>Technische Diagnose anzeigen</summary>
+          <pre
+            id="promptDebug"
+            style="white-space: pre-wrap; overflow:auto; max-height: 300px;"
+          ></pre>
+        </details>
       </div>
 
       <div id="consentSection" class="field consent-panel" hidden>
@@ -261,6 +340,14 @@
     const fieldsGrid = document.getElementById("fieldsGrid");
     const extraPrompt = document.getElementById("extraPrompt");
     const finalPrompt = document.getElementById("finalPrompt");
+    const negativePrompt = document.getElementById("negativePrompt");
+    const promptSections = document.getElementById("promptSections");
+    const successCriteria = document.getElementById("successCriteria");
+    const experimentSettings = document.getElementById("experimentSettings");
+    const mandatoryConstraints = document.getElementById("mandatoryConstraints");
+    const fixedSeedEnabled = document.getElementById("fixedSeedEnabled");
+    const fixedSeed = document.getElementById("fixedSeed");
+    const seedSummary = document.getElementById("seedSummary");
     const promptDebug = document.getElementById("promptDebug");
     const runButton = document.getElementById("run");
     const consentAccepted = document.getElementById("consentAccepted");
@@ -283,6 +370,7 @@
     let progressTimer = null;
     let previewTimer = null;
     let lastServerPrompt = "";
+    let lastNegativePrompt = "";
     let currentMode = "text_to_image";
     let availableModes = [];
 
@@ -410,6 +498,8 @@
       uploadCard.hidden = !requiresUpload;
       consentSection.hidden = !requiresUpload;
       textToImageNotice.hidden = requiresUpload;
+      experimentSettings.hidden = requiresUpload;
+      mandatoryConstraints.hidden = requiresUpload;
       runButton.textContent = requiresUpload
         ? "Bild experimentell bearbeiten"
         : "Bild generieren";
@@ -427,6 +517,9 @@
 
       gallery.replaceChildren();
       finalPrompt.value = "";
+      negativePrompt.value = "";
+      promptSections.replaceChildren();
+      successCriteria.replaceChildren();
       promptDebug.textContent = "";
       setProgress(0);
 
@@ -460,7 +553,12 @@
     }
 
 
-    function updateDebugBox(components, prompt, errorMessage = "") {
+    function updateDebugBox(
+      components,
+      prompt,
+      negative = "",
+      errorMessage = ""
+    ) {
       const lines = [];
 
       lines.push("Komponenten, die an FastAPI gesendet werden:");
@@ -476,6 +574,12 @@
 
       lines.push("Server-Prompt:");
       lines.push(prompt || "");
+
+      if (negative) {
+        lines.push("");
+        lines.push("Negative Prompt:");
+        lines.push(negative);
+      }
 
       promptDebug.textContent = lines.join("\n");
     }
@@ -563,8 +667,54 @@
 
       components.extraPrompt = extraPrompt.value.trim();
       components.banner = collectBannerSettings();
+      components.generation = {
+        fixed_seed: Boolean(fixedSeedEnabled.checked),
+        seed: Number.parseInt(fixedSeed.value, 10)
+      };
 
       return components;
+    }
+
+
+    function renderFrameworkOutput(data) {
+      promptSections.replaceChildren();
+      successCriteria.replaceChildren();
+
+      const sections = Array.isArray(data?.sections)
+        ? data.sections
+        : [];
+
+      for (const section of sections) {
+        const article = document.createElement("article");
+        article.className = "prompt-section";
+
+        const title = document.createElement("strong");
+        title.textContent = String(section?.title || "Abschnitt");
+
+        const text = document.createElement("p");
+        text.textContent = String(section?.text || "");
+
+        article.append(title, text);
+        promptSections.appendChild(article);
+      }
+
+      const criteria = Array.isArray(data?.success_criteria)
+        ? data.success_criteria
+        : [];
+
+      for (const criterion of criteria) {
+        const item = document.createElement("li");
+        item.textContent = typeof criterion === "string"
+          ? criterion
+          : String(criterion?.label || criterion?.prompt || "");
+        successCriteria.appendChild(item);
+      }
+
+      const generation = data?.components?.generation || {};
+
+      seedSummary.textContent = generation.fixed_seed
+        ? `Vergleichs-Seed: ${generation.seed}`
+        : "Seed: zufällig";
     }
 
 
@@ -595,27 +745,23 @@
           );
         }
 
-        lastServerPrompt = data?.prompt || "";
+        lastServerPrompt = data?.positive_prompt || data?.prompt || "";
+        lastNegativePrompt = data?.negative_prompt || "";
         finalPrompt.value = lastServerPrompt;
+        negativePrompt.value = lastNegativePrompt;
+
+        renderFrameworkOutput(data);
 
         updateDebugBox(
           data?.components || components,
-          lastServerPrompt
-        );
-
-        console.log(
-          "PROMPT-KOMPONENTEN:",
-          data?.components || components
-        );
-
-        console.log(
-          "SERVER-PROMPT:",
-          lastServerPrompt
+          lastServerPrompt,
+          lastNegativePrompt
         );
 
         return {
           components: data?.components || components,
           prompt: lastServerPrompt,
+          negativePrompt: lastNegativePrompt,
           ok: true
         };
 
@@ -626,10 +772,14 @@
         );
 
         finalPrompt.value = "";
+        negativePrompt.value = "";
         lastServerPrompt = "";
+        lastNegativePrompt = "";
+        renderFrameworkOutput({components, sections: [], success_criteria: []});
 
         updateDebugBox(
           components,
+          "",
           "",
           error.message
         );
@@ -688,6 +838,82 @@
 
         fieldsGrid.replaceChildren();
 
+        const sectionMeta = {
+          briefing: {
+            title: "1 · Kampagnenbriefing",
+            description: "Ziel, Zielgruppe, Branchenkontext, Nutzen und Wettbewerbsimpuls"
+          },
+          visual: {
+            title: "2 · Visuelle Spezifikation",
+            description: "Beobachtbare Szene, Personendarstellung und fotografische Gestaltung"
+          },
+          output: {
+            title: "3 · Ausgabeformat",
+            description: "Kanalnahes Seitenverhältnis und anschließende Kampagnengestaltung"
+          },
+          legacy: {
+            title: "Experimentelle Bildbearbeitung",
+            description: "Einstellungen des unveränderten Image-to-Image-Zusatzmodus"
+          }
+        };
+
+        const briefingFields = new Set([
+          "creativeDirection",
+          "campaignGoal",
+          "targetGroup",
+          "employerContext",
+          "employerBenefit",
+          "competitorInsight"
+        ]);
+
+        const outputFields = new Set(["aspectRatio"]);
+        const sectionContainers = new Map();
+
+        function sectionForField(fieldId) {
+          if (currentMode !== "text_to_image") {
+            return "legacy";
+          }
+
+          if (briefingFields.has(fieldId)) {
+            return "briefing";
+          }
+
+          if (outputFields.has(fieldId)) {
+            return "output";
+          }
+
+          return "visual";
+        }
+
+        function getSectionContainer(sectionId) {
+          if (sectionContainers.has(sectionId)) {
+            return sectionContainers.get(sectionId);
+          }
+
+          const meta = sectionMeta[sectionId];
+          const section = document.createElement("section");
+          section.className = "form-section";
+
+          const heading = document.createElement("div");
+          heading.className = "form-section-heading";
+
+          const title = document.createElement("h4");
+          title.textContent = meta.title;
+
+          const description = document.createElement("p");
+          description.textContent = meta.description;
+
+          const grid = document.createElement("div");
+          grid.className = "grid";
+
+          heading.append(title, description);
+          section.append(heading, grid);
+          fieldsGrid.appendChild(section);
+          sectionContainers.set(sectionId, grid);
+
+          return grid;
+        }
+
         for (const field of data) {
           if (
             !field ||
@@ -719,6 +945,7 @@
 
             option.value = String(optionData.value ?? "");
             option.textContent = String(optionData.label ?? "");
+            option.selected = Boolean(optionData.default);
 
             select.appendChild(option);
           }
@@ -736,7 +963,9 @@
           wrapper.appendChild(label);
           wrapper.appendChild(select);
 
-          fieldsGrid.appendChild(wrapper);
+          getSectionContainer(
+            sectionForField(field.id)
+          ).appendChild(wrapper);
         }
 
         console.log(
@@ -760,6 +989,7 @@
 
         updateDebugBox(
           {},
+          "",
           "",
           error.message
         );
@@ -853,6 +1083,21 @@
     );
 
     bannerColor.addEventListener(
+      "input",
+      schedulePromptPreview
+    );
+
+    function updateSeedState() {
+      fixedSeed.disabled = !fixedSeedEnabled.checked;
+      schedulePromptPreview();
+    }
+
+    fixedSeedEnabled.addEventListener(
+      "change",
+      updateSeedState
+    );
+
+    fixedSeed.addEventListener(
       "input",
       schedulePromptPreview
     );
@@ -961,16 +1206,6 @@
         return;
       }
 
-      console.log(
-        "PROMPT-KOMPONENTEN WERDEN AN FASTAPI GESENDET:",
-        components
-      );
-
-      console.log(
-        "VORSCHAU-PROMPT:",
-        prompt
-      );
-
       runButton.disabled = true;
 
       gallery.replaceChildren();
@@ -1023,20 +1258,27 @@
           );
         }
 
-        console.log(
-          "ANTWORT VOM BACKEND:",
-          data
-        );
-
         if (data?.submitted_prompt) {
           finalPrompt.value = data.submitted_prompt;
           lastServerPrompt = data.submitted_prompt;
         }
 
+        if (data?.submitted_negative_prompt !== undefined) {
+          negativePrompt.value = data.submitted_negative_prompt || "";
+          lastNegativePrompt = data.submitted_negative_prompt || "";
+        }
+
+        renderFrameworkOutput({
+          components: data?.prompt_components || components,
+          sections: data?.prompt_sections || [],
+          success_criteria: data?.success_criteria || []
+        });
+
         if (data?.prompt_components) {
           updateDebugBox(
             data.prompt_components,
-            data.submitted_prompt || ""
+            data.submitted_prompt || "",
+            data.submitted_negative_prompt || ""
           );
         }
 
@@ -1087,6 +1329,7 @@
         updateDebugBox(
           components,
           prompt,
+          lastNegativePrompt,
           error.message
         );
 
@@ -1101,6 +1344,7 @@
     // ------------------------------------------------------------
 
     updateBannerVisibility();
+    fixedSeed.disabled = !fixedSeedEnabled.checked;
 
     loadApplicationConfig().catch(error => {
       console.error("Initialisierungsfehler:", error);

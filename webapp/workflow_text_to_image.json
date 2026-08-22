@@ -44,7 +44,7 @@
   },
   "5": {
     "inputs": {
-      "text": "low resolution, low quality, distorted anatomy, malformed hands, extra fingers, duplicated people, oversaturated colors, waxy skin, artificial face, blurred details, chaotic composition, generated text, watermark, company logo, brand name, employee identification card, nudity, sexual content, pornography, violence, blood, weapons, drugs, hate symbols, extremist symbols, discriminatory depiction",
+      "text": "low resolution, low quality, distorted anatomy, malformed hands, extra fingers, duplicated people, oversaturated colors, waxy skin, artificial face, blurred details, chaotic composition, identifiable real person, real employee likeness, generated text, watermark, company logo, readable brand name, employee identification card, staged stock photo pose, exaggerated enthusiasm, tokenism, stereotypical depiction, discriminatory depiction, nudity, sexual content, pornography, violence, blood, weapons, drugs, hate symbols, extremist symbols",
       "clip": [
         "2",
         0
