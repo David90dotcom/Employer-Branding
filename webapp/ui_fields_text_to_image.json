@@ -206,20 +206,20 @@
       },
       {
         "label": "Eine junge erwachsene Person",
-        "value": "One fictional young adult between approximately 18 and 25 is the clear main subject. The person looks natural, credible, and appropriate for an early-career employer-branding campaign."
+        "value": "One clearly adult fictional person between approximately 20 and 25 is the clear main subject. The person looks natural, credible, and appropriate for an early-career employer-branding campaign."
       },
       {
         "label": "Eine Person im dualen Studium",
-        "value": "One fictional young adult in a dual-study context is the clear main subject. The portrayal communicates curiosity, growing responsibility, and practical learning without presenting the person as a real employee.",
+        "value": "One clearly adult fictional person between approximately 20 and 25 in a dual-study context is the clear main subject. The portrayal communicates curiosity, growing responsibility, and practical learning without presenting the person as a real employee.",
         "default": true
       },
       {
         "label": "Zwei gleichwertige Personen",
-        "value": "Two fictional young adults are shown with equal visual importance while working on the same credible task. Neither person is treated as a token or decorative background figure."
+        "value": "Two clearly adult fictional people aged 18 or older are shown with equal visual importance while working on the same credible task. Neither person is treated as a token or decorative background figure."
       },
       {
         "label": "Kleines vielfältiges Team",
-        "value": "A small fictional team of three people with naturally varied appearances collaborates as equals. Diversity is shown without stereotypes, exaggerated symbolism, or tokenism."
+        "value": "A small fictional team of three clearly adult people aged 18 or older with naturally varied appearances collaborates as equals. Diversity is shown without stereotypes, exaggerated symbolism, or tokenism."
       }
     ]
   },
@@ -238,16 +238,16 @@
       },
       {
         "label": "Austausch mit einer Person",
-        "value": "The main person exchanges information with one colleague while both focus on the same document, screen, product, tool, or work object."
+        "value": "The main person exchanges information with one clearly adult fictional colleague while both focus on the same document, screen, product, tool, or work object."
       },
       {
         "label": "Praktische Anleitung",
-        "value": "A concrete learning moment is visible: one person explains a work step while the other follows the same object, process, or document.",
+        "value": "A concrete learning moment is visible between two clearly adult fictional people: one adult colleague explains a work step while the other follows the same object, process, or document.",
         "default": true
       },
       {
         "label": "Team bespricht eine Aufgabe",
-        "value": "A small team briefly discusses a concrete task around a shared table, screen, plan, product display, or work area."
+        "value": "A small team of clearly adult fictional colleagues briefly discusses a concrete task around a shared table, screen, plan, product display, or work area."
       },
       {
         "label": "Ergebnis prüfen oder übergeben",

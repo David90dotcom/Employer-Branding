@@ -128,8 +128,11 @@ TEXT_TO_IMAGE_NEGATIVE_PROMPT = (
     "real person, real employee likeness, generated text, watermark, company "
     "logo, readable brand name, employee identification card, staged stock "
     "photo pose, exaggerated enthusiasm, tokenism, stereotypical depiction, "
-    "discriminatory depiction, nudity, sexual content, pornography, violence, "
-    "blood, weapons, drugs, hate symbols, extremist symbols"
+    "discriminatory depiction, child, children, minor, underage person, "
+    "teenager, school pupil, school uniform, family with children, youthful "
+    "background person, age-ambiguous person, unnecessary bystanders, crowd, "
+    "nudity, sexual content, pornography, violence, blood, weapons, drugs, "
+    "hate symbols, extremist symbols"
 )
 
 
@@ -806,6 +809,18 @@ def build_success_criteria(components):
         },
         {
             "prompt": (
+                "Every visible person must be a clearly recognizable fictional "
+                "adult aged 18 or older; no children, minors, school pupils, "
+                "or age-ambiguous background people may appear."
+            ),
+            "label": (
+                "Alle sichtbaren Personen sind eindeutig als volljährige "
+                "fiktive Erwachsene erkennbar; Minderjährige oder altersmäßig "
+                "uneindeutige Hintergrundpersonen sind ausgeschlossen."
+            )
+        },
+        {
+            "prompt": (
                 "No identifiable real person, logo, readable brand name, "
                 "tokenism, or stereotypical depiction may appear."
             ),
@@ -935,7 +950,12 @@ def build_text_to_image_sections(components):
         "fictional people as real employees or testimonials. No company logos, "
         "readable brand names, employee identification cards, exaggerated "
         "enthusiasm, tokenism, discriminatory content, or stereotypical "
-        "depiction. Human review is required before publication."
+        "depiction. Every visible person must be a clearly recognizable "
+        "fictional adult aged 18 or older. Do not depict children, minors, "
+        "school pupils, school uniforms, families with children, or people "
+        "whose age appears ambiguous. Show only the people required for the "
+        "selected workplace task and keep the background free of unnecessary "
+        "bystanders. Human review is required before publication."
     )
 
     aspect_ratio = components.get("aspectRatio", "16:9") or "16:9"
@@ -1017,6 +1037,18 @@ def build_prompt_chain_success_criteria(components):
         },
         {
             "prompt": (
+                "Every visible person must remain or become a clearly "
+                "recognizable fictional adult aged 18 or older; no children, "
+                "minors, or age-ambiguous people may be introduced."
+            ),
+            "label": (
+                "Alle sichtbaren Personen sind eindeutig als volljährige "
+                "fiktive Erwachsene erkennbar; die Überarbeitung ergänzt "
+                "keine Minderjährigen oder altersmäßig uneindeutigen Personen."
+            )
+        },
+        {
+            "prompt": (
                 "Work activity, gaze, gestures, hands, objects, and any social "
                 "interaction must be physically plausible and causally aligned."
             ),
@@ -1061,13 +1093,14 @@ def build_prompt_chain_success_criteria(components):
             {
                 "prompt": (
                     "Every additional fictional person must have a clear role "
-                    "in the same workplace task and must not function as visual "
+                    "in the same workplace task, must be a clearly recognizable "
+                    "adult aged 18 or older, and must not function as visual "
                     "decoration."
                 ),
                 "label": (
                     "Jede zusätzliche fiktive Person erfüllt eine erkennbare "
-                    "Funktion in derselben Arbeitssituation und dient nicht nur "
-                    "als Dekoration."
+                    "Funktion in derselben Arbeitssituation, ist eindeutig "
+                    "volljährig und dient nicht nur als Dekoration."
                 )
             }
         )
@@ -1158,10 +1191,13 @@ def build_prompt_chain_sections(components):
         "main person. Do not imitate any identifiable real person. Do not add "
         "company logos, readable brand names, employee identification cards, "
         "generated campaign typography, or unverifiable employment claims. "
-        "Any additional people must be fictional and must contribute naturally "
-        "to the same task; avoid tokenism, stereotypes, exaggerated enthusiasm, "
-        "and staged stock-photo poses. Keep anatomy, hands, gaze, work objects, "
-        "lighting, scale, and spatial relationships physically plausible."
+        "Every visible person must be a clearly recognizable fictional adult "
+        "aged 18 or older. Do not add children, minors, school pupils, families "
+        "with children, age-ambiguous people, or unnecessary bystanders. Any "
+        "additional adults must contribute naturally to the same task; avoid "
+        "tokenism, stereotypes, exaggerated enthusiasm, and staged stock-photo "
+        "poses. Keep anatomy, hands, gaze, work objects, lighting, scale, and "
+        "spatial relationships physically plausible."
     )
 
     output_parts = [

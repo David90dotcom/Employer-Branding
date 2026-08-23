@@ -137,6 +137,12 @@ oder Testimonials ausgegeben werden. Jedes Ergebnis erhält automatisiert den
 eingebetteten Hinweis `KI-generiert` und muss vor einer Nutzung fachlich,
 ethisch sowie markenrechtlich geprüft werden.
 
+Alle dargestellten Personen müssen eindeutig als volljährige fiktive
+Erwachsene erkennbar sein. Kinder, Minderjährige und altersmäßig uneindeutige
+Hintergrundpersonen werden durch Positivprompt, Negative Prompt und
+Erfolgskriterien ausdrücklich ausgeschlossen; die menschliche Sichtprüfung
+bleibt dennoch verbindlich.
+
 Reale Unternehmenslogos werden nicht durch das Modell generiert und sind nicht Bestandteil des Repositorys. Ein berechtigt verwendetes Logo sollte erst nach der Generierung als exakter Overlay ergänzt werden.
 
 Temporäre Ergebnisse und die bewusst gespeicherte Kampagnenbibliothek liegen

@@ -61,7 +61,24 @@ class GenerationModeTests(unittest.TestCase):
         self.assertIn("TASK AND CAMPAIGN GOAL", prompt)
         self.assertIn("completely fictional", prompt)
         self.assertIn("SUCCESS CRITERIA", prompt)
+        self.assertIn("adult aged 18 or older", prompt)
+        self.assertIn("no children, minors", prompt)
         self.assertNotIn("uploaded person", prompt.lower())
+
+    def test_text_to_image_excludes_minors_and_ambiguous_background_people(self):
+        raw = default_components_for_mode("text_to_image")
+        components = module.normalize_prompt_components(raw, "text_to_image")
+        package = module.build_prompt_package(components, "text_to_image")
+
+        self.assertIn("age appears ambiguous", package["positive_prompt"])
+        self.assertIn("minor", package["negative_prompt"])
+        self.assertIn("school pupil", package["negative_prompt"])
+        self.assertTrue(
+            any(
+                "volljährige" in criterion["label"]
+                for criterion in package["success_criteria"]
+            )
+        )
 
     def test_text_to_image_workflow_is_patched_from_config(self):
         raw = default_components_for_mode("text_to_image")
@@ -193,6 +210,8 @@ class GenerationModeTests(unittest.TestCase):
             "Change only explicitly requested elements",
             package["positive_prompt"]
         )
+        self.assertIn("adult aged 18 or older", package["positive_prompt"])
+        self.assertIn("Do not add children, minors", package["positive_prompt"])
         self.assertIn("Definition of done", package["positive_prompt"])
 
     def test_prompt_chain_fields_cover_campaign_optimization(self):
