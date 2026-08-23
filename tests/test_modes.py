@@ -944,6 +944,103 @@ class GenerationModeTests(unittest.TestCase):
                 module.TEMP_RESULTS_DIR = original_temp_results_dir
                 module.TEMP_RESULTS.clear()
 
+    def test_layout_variant_reuses_clean_source_without_model_generation(self):
+        source_bytes = self.make_test_image(960, 540)
+        banner = module.normalize_banner_settings({
+            "banner": {
+                "enabled": True,
+                "text": "Ein Studium. Drei Praxiswelten.",
+                "subtext": "Duales Studium",
+                "position": "right",
+                "style": "minimal_shadow",
+                "font": "bold",
+                "font_scale": "large",
+                "align": "left",
+                "color": "#1457ff"
+            }
+        })
+        logo = module.normalize_logo_settings({
+            "logo": {
+                "enabled": False
+            }
+        })
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            original_temp_results_dir = module.TEMP_RESULTS_DIR
+
+            try:
+                module.TEMP_RESULTS_DIR = Path(temporary_directory)
+                module.TEMP_RESULTS.clear()
+                source_result = module.register_temporary_result(
+                    display_bytes=source_bytes,
+                    source_bytes=source_bytes,
+                    metadata={
+                        "mode": "prompt_chain",
+                        "parent_id": None,
+                        "positive_prompt": "Original prompt",
+                        "negative_prompt": "",
+                        "provider": "local",
+                        "model_name": "test-model.safetensors",
+                        "components": {
+                            "generation": {
+                                "provider": "local",
+                                "actual_seed": 20260822
+                            }
+                        }
+                    }
+                )
+
+                with patch.object(module, "queue_prompt") as queue_prompt:
+                    with patch.object(
+                        module,
+                        "request_openai_image"
+                    ) as cloud_request:
+                        with patch.object(
+                            module,
+                            "render_ai_overlay_on_image",
+                            side_effect=lambda image_bytes: image_bytes
+                        ):
+                            variant = module.create_layout_variant(
+                                banner=banner,
+                                logo_settings=logo,
+                                result_id=source_result["result_id"]
+                            )
+
+                queue_prompt.assert_not_called()
+                cloud_request.assert_not_called()
+                self.assertTrue(variant["layout_only"])
+                entry = module.TEMP_RESULTS[variant["result_id"]]
+                self.assertEqual(entry["source_path"].read_bytes(), source_bytes)
+                self.assertNotEqual(entry["display_path"].read_bytes(), source_bytes)
+                self.assertTrue(
+                    entry["components"]["postprocessing"]["layout_only"]
+                )
+                self.assertEqual(
+                    entry["components"]["banner"]["font_scale"],
+                    "large"
+                )
+            finally:
+                module.TEMP_RESULTS_DIR = original_temp_results_dir
+                module.TEMP_RESULTS.clear()
+
+    def test_layout_variant_requires_exactly_one_clean_source(self):
+        with self.assertRaises(HTTPException) as raised:
+            module.create_layout_variant(
+                banner={"enabled": False},
+                logo_settings={"enabled": False}
+            )
+
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn("exactly one layout source", raised.exception.detail)
+
+    def test_layout_studio_exposes_typography_and_no_ai_action(self):
+        html = module.INDEX_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("Vereinfachtes Text- und Layoutwerkzeug", html)
+        self.assertIn('id="bannerFontScale"', html)
+        self.assertIn("Layout ohne KI anwenden", html)
+        self.assertIn('fetch(\n          "/api/layout/apply"', html)
+
     def test_library_only_contains_explicitly_saved_results(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -1015,6 +1112,35 @@ class GenerationModeTests(unittest.TestCase):
                 self.assertTrue(
                     (module.LIBRARY_IMAGES_DIR / f"{item['id']}_source.png").exists()
                 )
+
+                with patch.object(
+                    module,
+                    "render_ai_overlay_on_image",
+                    side_effect=lambda image_bytes: image_bytes
+                ):
+                    library_layout = module.create_layout_variant(
+                        banner=module.normalize_banner_settings({
+                            "banner": {
+                                "enabled": False
+                            }
+                        }),
+                        logo_settings=module.normalize_logo_settings({
+                            "logo": {
+                                "enabled": False
+                            }
+                        }),
+                        library_source_id=item["id"]
+                    )
+
+                library_layout_entry = module.TEMP_RESULTS[
+                    library_layout["result_id"]
+                ]
+                self.assertEqual(
+                    library_layout_entry["source_path"].read_bytes(),
+                    image_bytes
+                )
+                self.assertEqual(library_layout_entry["parent_id"], item["id"])
+                self.assertTrue(library_layout_entry["layout_only"])
 
                 module.delete_library_item(item["id"])
                 self.assertEqual(module.list_library_items(), [])

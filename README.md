@@ -164,6 +164,22 @@ ermöglicht auch in Stufe 2 besser kontrollierbare Promptvergleiche.
 Die Definition of Done wird als separates menschliches Prüfraster angezeigt
 und nicht in den Optimierungs-Prompt geschrieben.
 
+## Layout-Studio ohne erneute Bildgenerierung
+
+Kampagnentext und Logo können sowohl während eines Bildlaufs als auch später
+auf ein temporäres oder bereits gespeichertes Motiv gesetzt werden. Dafür
+verwendet die App stets die saubere interne Bildquelle und ruft weder ComfyUI
+noch die Cloud Images API erneut auf. Das vereinfachte Textwerkzeug bietet
+Headline, optionale Subheadline, Position, Bannerstil, Schriftstil,
+Schriftgröße, Ausrichtung und Akzentfarbe. Ein optionales Logo kann weiterhin
+als PNG frei positioniert und skaliert werden.
+
+`Layout ohne KI anwenden` erzeugt zunächst eine neue temporäre
+Gestaltungsvariante. Sie kann kontrolliert betrachtet und anschließend über
+den bestehenden Button `In Bibliothek speichern` dauerhaft abgelegt werden.
+Das ursprüngliche Bild bleibt dabei unverändert und die Bibliothek kennzeichnet
+solche Varianten ausdrücklich als `Layout ohne Bild-KI`.
+
 Die Kampagnenbibliothek liegt ausschließlich unter `webapp/data/` und wird von
 Git ignoriert. Sie wird daher weder committed noch nach GitHub hochgeladen.
 
@@ -262,9 +278,9 @@ Bestandteil des Repositorys. Ein Logo kann optional als PNG ausgewählt,
 horizontal und vertikal positioniert sowie zwischen 5 und 30 Prozent der
 Bildbreite skaliert werden. Die App akzeptiert ausschließlich eine lesbare PNG
 bis 5 MB und kodiert sie ohne eingebettete Metadaten neu. Die Datei wird nur im
-Arbeitsspeicher des aktuellen Generierungsaufrufs verarbeitet. Ob die konkrete
-Verwendung zulässig ist, hängt vom jeweiligen Kontext ab und muss von der
-anwendenden Person selbst geprüft werden.
+Arbeitsspeicher des aktuellen Gestaltungs- oder Generierungsaufrufs verarbeitet.
+Ob die konkrete Verwendung zulässig ist, hängt vom jeweiligen Kontext ab und
+muss von der anwendenden Person selbst geprüft werden.
 
 Banner und Logo werden ausschließlich auf das Anzeige- und Exportbild gelegt.
 Die saubere interne Quelle für eine spätere Prompt-Chain-Stufe bleibt ohne

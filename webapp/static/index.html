@@ -140,10 +140,23 @@
         </div>
       </div>
 
+      <div class="layout-studio-intro">
+        <div>
+          <strong>Vereinfachtes Text- und Layoutwerkzeug</strong>
+          <span>
+            Headline, Subheadline, Schriftwirkung, Ausrichtung, Position und
+            optionales Logo festlegen. Die Gestaltung kann bei einer
+            Generierung oder später über „Layout ohne KI anwenden“ auf eine
+            saubere Bildquelle gesetzt werden.
+          </span>
+        </div>
+        <span class="layout-studio-badge">kein Modellaufruf erforderlich</span>
+      </div>
+
       <div class="field" style="margin-top: 18px;">
         <label>
           <input id="bannerEnabled" type="checkbox">
-          Textbanner auf Ergebnisbild setzen
+          Kampagnentext hinzufügen (optional)
         </label>
       </div>
 
@@ -219,6 +232,18 @@
           </div>
 
           <div class="field">
+            <label for="bannerFontScale">
+              Schriftgröße
+            </label>
+
+            <select id="bannerFontScale">
+              <option value="compact">Kompakt</option>
+              <option value="standard" selected>Standard</option>
+              <option value="large">Groß</option>
+            </select>
+          </div>
+
+          <div class="field">
             <label for="bannerAlign">
               Textausrichtung
             </label>
@@ -232,7 +257,7 @@
 
           <div class="field">
             <label for="bannerColor">
-              Markenfarbe
+              Akzent-/Markenfarbe
             </label>
 
             <input
@@ -516,6 +541,7 @@
     const bannerPosition = document.getElementById("bannerPosition");
     const bannerStyle = document.getElementById("bannerStyle");
     const bannerFont = document.getElementById("bannerFont");
+    const bannerFontScale = document.getElementById("bannerFontScale");
     const bannerAlign = document.getElementById("bannerAlign");
     const bannerColor = document.getElementById("bannerColor");
 
@@ -1055,16 +1081,32 @@
         meta.textContent = [
           modeLabel,
           providerLabel,
+          item.layout_only ? "Layout ohne Bild-KI" : "",
           formatSavedDate(item.saved_at),
           item.seed !== null && item.seed !== undefined
             ? `Seed ${item.seed}`
             : item.provider === "openai"
               ? "ohne Seedsteuerung"
               : "zufälliger Seed"
-        ].join(" · ");
+        ].filter(Boolean).join(" · ");
 
         const actions = document.createElement("div");
         actions.className = "item-actions";
+
+        const layoutButton = makeSmallButton(
+          "Layout ohne KI anwenden",
+          "secondary-button"
+        );
+        layoutButton.title = (
+          "Verwendet die oben eingestellten Texte und Overlays, ohne das Bildmodell erneut aufzurufen."
+        );
+        layoutButton.addEventListener("click", () => {
+          applyLayoutWithoutGeneration(
+            {library_source_id: item.id},
+            layoutButton
+          );
+        });
+        actions.appendChild(layoutButton);
 
         const chainable = [
           "text_to_image",
@@ -1244,10 +1286,24 @@
 
       const resultState = document.createElement("div");
       resultState.className = "result-state";
-      resultState.textContent = "Temporär · noch nicht gespeichert";
+      resultState.textContent = result.layout_only
+        ? "Layout ohne Bild-KI · noch nicht gespeichert"
+        : "Temporär · noch nicht gespeichert";
 
       const actions = document.createElement("div");
       actions.className = "item-actions result-actions";
+
+      const layoutButton = makeSmallButton(
+        "Layout ohne KI anwenden",
+        "secondary-button"
+      );
+      layoutButton.addEventListener("click", () => {
+        applyLayoutWithoutGeneration(
+          {result_id: result.result_id},
+          layoutButton
+        );
+      });
+      actions.appendChild(layoutButton);
 
       const saveButton = makeSmallButton(
         "In Bibliothek speichern",
@@ -1295,6 +1351,7 @@
         position: bannerPosition.value,
         style: bannerStyle.value,
         font: bannerFont.value,
+        font_scale: bannerFontScale.value,
         align: bannerAlign.value,
         color: bannerColor.value
       };
@@ -1374,6 +1431,125 @@
         y_percent: Number.parseInt(logoY.value, 10),
         size_percent: Number.parseInt(logoSize.value, 10)
       };
+    }
+
+
+    function getValidatedLogoFile() {
+      if (!logoEnabled.checked) {
+        return null;
+      }
+
+      const selectedLogoFile = logoFile.files?.[0] || null;
+
+      if (!selectedLogoFile) {
+        throw new Error("Bitte zuerst eine Logo-PNG auswählen.");
+      }
+
+      if (
+        !selectedLogoFile.name.toLowerCase().endsWith(".png") ||
+        (selectedLogoFile.type && selectedLogoFile.type !== "image/png")
+      ) {
+        throw new Error(
+          "Als Firmenlogo ist ausschließlich eine PNG-Datei erlaubt."
+        );
+      }
+
+      if (selectedLogoFile.size > 5 * 1024 * 1024) {
+        throw new Error("Die Logo-PNG darf höchstens 5 MB groß sein.");
+      }
+
+      return selectedLogoFile;
+    }
+
+
+    async function applyLayoutWithoutGeneration(source, triggerButton) {
+      if (bannerEnabled.checked && !bannerText.value.trim()) {
+        alert("Bitte zuerst eine Banner-Headline eingeben.");
+        return;
+      }
+
+      if (!bannerEnabled.checked && !logoEnabled.checked) {
+        const confirmed = window.confirm(
+          "Banner und Logo sind ausgeschaltet. Die neue Variante enthält nur die verpflichtende KI-Kennzeichnung und entfernt vorhandene Layout-Overlays. Fortfahren?"
+        );
+
+        if (!confirmed) {
+          return;
+        }
+      }
+
+      let selectedLogoFile = null;
+
+      try {
+        selectedLogoFile = getValidatedLogoFile();
+      } catch (error) {
+        alert(error.message);
+        return;
+      }
+
+      const originalLabel = triggerButton.textContent;
+      triggerButton.disabled = true;
+      triggerButton.textContent = "Layout wird gesetzt …";
+      setStatus(
+        "Text und Overlays werden ohne erneuten Bildmodellaufruf angewendet …"
+      );
+
+      const formData = new FormData();
+      formData.append(
+        "layout_settings",
+        JSON.stringify({
+          banner: collectBannerSettings(),
+          logo: collectLogoSettings()
+        })
+      );
+
+      if (source.result_id) {
+        formData.append("result_id", source.result_id);
+      } else if (source.library_source_id) {
+        formData.append("library_source_id", source.library_source_id);
+      }
+
+      if (selectedLogoFile) {
+        formData.append(
+          "logo_file",
+          selectedLogoFile,
+          selectedLogoFile.name
+        );
+      }
+
+      try {
+        const response = await fetch(
+          "/api/layout/apply",
+          {
+            method: "POST",
+            body: formData,
+            cache: "no-store"
+          }
+        );
+        const data = await readResponseData(response);
+
+        if (!response.ok) {
+          throw new Error(formatServerError(data, response.status));
+        }
+
+        if (!data?.result) {
+          throw new Error("Der Server hat keine Layout-Variante zurückgegeben.");
+        }
+
+        renderGeneratedResult(data.result);
+        document.getElementById("resultsSection")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start"
+        });
+        setStatus(
+          "Layout ohne Bild-KI angewendet. Die neue Variante kann jetzt in der Bibliothek gespeichert werden."
+        );
+      } catch (error) {
+        setStatus(`Layout konnte nicht angewendet werden: ${error.message}`);
+      } finally {
+        triggerButton.disabled = false;
+        triggerButton.textContent = originalLabel;
+      }
     }
 
 
@@ -2001,6 +2177,11 @@
       schedulePromptPreview
     );
 
+    bannerFontScale.addEventListener(
+      "change",
+      schedulePromptPreview
+    );
+
     bannerAlign.addEventListener(
       "change",
       schedulePromptPreview
@@ -2131,27 +2312,13 @@
         return;
       }
 
-      const selectedLogoFile = logoFile.files?.[0] || null;
+      let selectedLogoFile = null;
 
-      if (logoEnabled.checked) {
-        if (!selectedLogoFile) {
-          alert("Bitte zuerst eine Logo-PNG auswählen.");
-          return;
-        }
-
-        if (
-          !selectedLogoFile.name.toLowerCase().endsWith(".png") ||
-          (selectedLogoFile.type && selectedLogoFile.type !== "image/png")
-        ) {
-          alert("Als Firmenlogo ist ausschließlich eine PNG-Datei erlaubt.");
-          return;
-        }
-
-        if (selectedLogoFile.size > 5 * 1024 * 1024) {
-          alert("Die Logo-PNG darf höchstens 5 MB groß sein.");
-          return;
-        }
-
+      try {
+        selectedLogoFile = getValidatedLogoFile();
+      } catch (error) {
+        alert(error.message);
+        return;
       }
 
       const preview = await requestPromptPreview();

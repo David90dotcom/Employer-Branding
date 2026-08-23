@@ -496,6 +496,7 @@ def register_temporary_result(display_bytes, source_bytes, metadata):
         "result_id": result_id,
         "view_url": f"/api/results/{result_id}/image",
         "saved": False,
+        "layout_only": bool(entry.get("layout_only", False)),
         "mode": entry.get("mode", DEFAULT_MODE),
         "parent_id": entry.get("parent_id"),
         "provider": entry.get(
@@ -551,6 +552,9 @@ def serialize_library_row(row):
         "positive_prompt": row["positive_prompt"],
         "negative_prompt": row["negative_prompt"],
         "components": components,
+        "layout_only": bool(
+            components.get("postprocessing", {}).get("layout_only", False)
+        ),
         "provider": components.get("generation", {}).get(
             "provider",
             "local"
@@ -802,6 +806,9 @@ def normalize_banner_settings(raw_components):
     position = str(raw_banner.get("position", "auto") or "auto").strip()
     style = str(raw_banner.get("style", "dark_glass") or "dark_glass").strip()
     font = str(raw_banner.get("font", "modern") or "modern").strip()
+    font_scale = str(
+        raw_banner.get("font_scale", "standard") or "standard"
+    ).strip()
     align = str(raw_banner.get("align", "left") or "left").strip()
     color = str(raw_banner.get("color", "#1457ff") or "#1457ff").strip()
 
@@ -828,6 +835,12 @@ def normalize_banner_settings(raw_components):
         "condensed"
     }
 
+    allowed_font_scales = {
+        "compact",
+        "standard",
+        "large"
+    }
+
     allowed_aligns = {
         "left",
         "center",
@@ -842,6 +855,9 @@ def normalize_banner_settings(raw_components):
 
     if font not in allowed_fonts:
         font = "modern"
+
+    if font_scale not in allowed_font_scales:
+        font_scale = "standard"
 
     if align not in allowed_aligns:
         align = "left"
@@ -868,6 +884,7 @@ def normalize_banner_settings(raw_components):
         "position": position,
         "style": style,
         "font": font,
+        "font_scale": font_scale,
         "align": align,
         "color": color
     }
@@ -2200,6 +2217,7 @@ def render_banner_on_image(image_bytes, banner):
 
     style = banner.get("style", "dark_glass")
     font_style = banner.get("font", "modern")
+    font_scale = banner.get("font_scale", "standard")
     align = banner.get("align", "left")
     brand_color = parse_hex_color(
         banner.get("color", "#1457ff")
@@ -2230,6 +2248,13 @@ def render_banner_on_image(image_bytes, banner):
         text_max_width = box_width - 2 * inner_pad
         headline_max_height = int(box_height * 0.48)
         max_headline_size = int(width * 0.070)
+
+    font_scale_factor = {
+        "compact": 0.82,
+        "standard": 1.0,
+        "large": 1.16
+    }.get(font_scale, 1.0)
+    max_headline_size = int(max_headline_size * font_scale_factor)
 
     headline = banner.get("text", "")
     subtext = banner.get("subtext", "")
@@ -2650,6 +2675,121 @@ def render_ai_overlay_on_image(image_bytes):
         optimize=True
     )
     return output.getvalue()
+
+
+def create_layout_variant(
+    banner,
+    logo_settings,
+    logo_bytes=None,
+    result_id="",
+    library_source_id=""
+):
+    """Render deterministic layout layers without calling an image model."""
+    has_result_source = bool(str(result_id or "").strip())
+    has_library_source = bool(str(library_source_id or "").strip())
+
+    if has_result_source == has_library_source:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Choose exactly one layout source: a temporary result or a "
+                "saved campaign-library item."
+            )
+        )
+
+    if has_result_source:
+        source_entry = get_temporary_result(result_id)
+
+        if source_entry.get("mode") not in LIBRARY_SAVEABLE_MODES:
+            raise HTTPException(
+                status_code=400,
+                detail="Only fully synthetic results can be decorated."
+            )
+
+        source_bytes = source_entry["source_path"].read_bytes()
+        source_kind = "temporary_result"
+        source_id = source_entry["id"]
+        mode = source_entry.get("mode", DEFAULT_MODE)
+        parent_id = (
+            source_entry.get("library_id") or
+            source_entry.get("parent_id")
+        )
+        positive_prompt = source_entry.get("positive_prompt", "")
+        negative_prompt = source_entry.get("negative_prompt", "")
+        provider = source_entry.get("provider", "local")
+        model_name = source_entry.get("model_name")
+        source_components = source_entry.get("components", {})
+    else:
+        source_row = get_library_row(library_source_id)
+
+        if source_row["mode"] not in LIBRARY_SAVEABLE_MODES:
+            raise HTTPException(
+                status_code=400,
+                detail="Only fully synthetic library images can be decorated."
+            )
+
+        source_path = LIBRARY_IMAGES_DIR / source_row["source_filename"]
+
+        if not source_path.exists():
+            raise HTTPException(
+                status_code=404,
+                detail="The clean saved source image is no longer available."
+            )
+
+        source_bytes = source_path.read_bytes()
+        source_kind = "campaign_library"
+        source_id = source_row["id"]
+        mode = source_row["mode"]
+        parent_id = source_row["id"]
+        positive_prompt = source_row["positive_prompt"]
+        negative_prompt = source_row["negative_prompt"]
+        model_name = source_row["model_name"]
+        source_components = json.loads(source_row["components_json"] or "{}")
+        provider = source_components.get("generation", {}).get(
+            "provider",
+            "local"
+        )
+
+    components = json.loads(json.dumps(source_components))
+    components["banner"] = banner
+    components["logo"] = {
+        **logo_settings,
+        "applied": bool(logo_bytes)
+    }
+    components["postprocessing"] = {
+        "layout_only": True,
+        "source_kind": source_kind,
+        "source_id": source_id
+    }
+
+    display_bytes = source_bytes
+
+    if banner.get("enabled"):
+        display_bytes = render_banner_on_image(display_bytes, banner)
+
+    if logo_bytes:
+        display_bytes = render_logo_overlay_on_image(
+            display_bytes,
+            logo_bytes,
+            logo_settings
+        )
+
+    display_bytes = render_ai_overlay_on_image(display_bytes)
+
+    return register_temporary_result(
+        display_bytes=display_bytes,
+        source_bytes=source_bytes,
+        metadata={
+            "mode": mode,
+            "parent_id": parent_id,
+            "positive_prompt": positive_prompt,
+            "negative_prompt": negative_prompt,
+            "provider": provider,
+            "model_name": model_name,
+            "components": components,
+            "layout_only": True
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -3235,6 +3375,51 @@ async def save_to_campaign_library(payload: dict = Body(...)):
 
     return JSONResponse(
         content={"item": item},
+        headers=no_cache_headers()
+    )
+
+
+@app.post("/api/layout/apply")
+async def apply_layout_without_generation(
+    layout_settings: str = Form(...),
+    result_id: str = Form(""),
+    library_source_id: str = Form(""),
+    logo_file: UploadFile = File(None)
+):
+    try:
+        raw_settings = json.loads(layout_settings)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"layout_settings is not valid JSON: {exc}"
+        ) from exc
+
+    if not isinstance(raw_settings, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="layout_settings must be a JSON object."
+        )
+
+    banner = normalize_banner_settings(raw_settings)
+    logo_settings = normalize_logo_settings(raw_settings)
+    logo_bytes = await read_logo_upload(logo_file, logo_settings)
+    result = create_layout_variant(
+        banner=banner,
+        logo_settings=logo_settings,
+        logo_bytes=logo_bytes,
+        result_id=result_id,
+        library_source_id=library_source_id
+    )
+
+    return JSONResponse(
+        content={
+            "result": result,
+            "generation_skipped": True,
+            "message": (
+                "Banner, Logo und KI-Kennzeichnung wurden ohne erneuten "
+                "Bildmodellaufruf angewendet."
+            )
+        },
         headers=no_cache_headers()
     )
 

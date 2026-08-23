@@ -325,6 +325,45 @@ input[type="range"] {
   align-items: start;
 }
 
+.layout-studio-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 22px;
+  padding: 15px 16px;
+  border: 1px solid #b8cbed;
+  border-radius: 14px;
+  background: #f2f6ff;
+}
+
+.layout-studio-intro strong,
+.layout-studio-intro span {
+  display: block;
+}
+
+.layout-studio-intro strong {
+  color: #244f9f;
+}
+
+.layout-studio-intro div > span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.layout-studio-badge {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #176046;
+  background: #dff5eb;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .logo-control-stack {
   display: flex;
   flex-direction: column;
@@ -1008,6 +1047,10 @@ button:disabled {
   }
 
   .library-heading {
+    flex-direction: column;
+  }
+
+  .layout-studio-intro {
     flex-direction: column;
   }
 
