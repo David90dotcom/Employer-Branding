@@ -1,3 +1,4 @@
+import os
 import socket
 import subprocess
 import sys
@@ -9,11 +10,40 @@ from typing import Optional
 import requests
 
 
+def load_local_env(path: Path) -> None:
+    """Load simple KEY=VALUE entries without executing the file."""
+    if not path.exists():
+        return
+
+    for raw_line in path.read_text(encoding="utf-8-sig").splitlines():
+        line = raw_line.strip()
+
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+
+        if not key or not key.replace("_", "").isalnum():
+            continue
+
+        if (
+            len(value) >= 2 and
+            value[0] == value[-1] and
+            value[0] in {"'", '"'}
+        ):
+            value = value[1:-1]
+
+        os.environ.setdefault(key, value)
+
+
 # ---------------------------------------------------------------------------
 # Pfade
 # ---------------------------------------------------------------------------
 
 ROOT_DIR = Path(__file__).resolve().parent
+load_local_env(ROOT_DIR / ".env")
 
 WEBAPP_DIR = ROOT_DIR / "webapp"
 WEBAPP_APP_FILE = WEBAPP_DIR / "app.py"
@@ -55,6 +85,15 @@ OPEN_BROWSER = True
 # Bei True wird ComfyUI NICHT automatisch beendet,
 # wenn nur die Web-App beim Start abstürzt.
 KEEP_COMFY_RUNNING_ON_WEBAPP_ERROR = True
+
+SKIP_COMFYUI = os.getenv(
+    "EMPLOYER_BRANDING_SKIP_COMFYUI",
+    "0"
+).strip().lower() in {"1", "true", "yes", "on"}
+
+CLOUD_PROVIDER_CONFIGURED = bool(
+    os.getenv("OPENAI_API_KEY", "").strip()
+)
 
 
 # ---------------------------------------------------------------------------
@@ -98,9 +137,16 @@ def validate_paths() -> None:
     validate_file(WEBAPP_APP_FILE, "Web-App app.py")
     validate_file(WEBAPP_PYTHON, "Python der Web-App-Umgebung")
 
-    validate_directory(COMFY_DIR, "ComfyUI-Ordner")
-    validate_file(COMFY_MAIN_FILE, "ComfyUI main.py")
-    validate_file(COMFY_PYTHON, "Python der ComfyUI-Umgebung")
+    if not SKIP_COMFYUI:
+        validate_directory(COMFY_DIR, "ComfyUI-Ordner")
+        validate_file(COMFY_MAIN_FILE, "ComfyUI main.py")
+        validate_file(COMFY_PYTHON, "Python der ComfyUI-Umgebung")
+
+    if SKIP_COMFYUI and not CLOUD_PROVIDER_CONFIGURED:
+        raise RuntimeError(
+            "EMPLOYER_BRANDING_SKIP_COMFYUI ist aktiviert, aber "
+            "OPENAI_API_KEY ist nicht konfiguriert."
+        )
 
 
 def is_port_open(host: str, port: int, timeout: float = 1.0) -> bool:
@@ -301,7 +347,8 @@ def open_log_file(path: Path):
 def print_log_hint() -> None:
     print()
     print("Log-Dateien:")
-    print(f"ComfyUI: {COMFY_LOG_PATH}")
+    if not SKIP_COMFYUI:
+        print(f"ComfyUI: {COMFY_LOG_PATH}")
     print(f"Web-App: {WEBAPP_LOG_PATH}")
     print()
 
@@ -387,11 +434,15 @@ def print_configuration() -> None:
     print("WEBAPP_PYTHON:         ", WEBAPP_PYTHON)
     print("WEBAPP_URL:            ", WEBAPP_URL)
     print()
-    print("COMFY_DIR:             ", COMFY_DIR)
-    print("COMFY_MAIN_FILE:       ", COMFY_MAIN_FILE)
-    print("COMFY_PYTHON:          ", COMFY_PYTHON)
-    print("COMFY_URL:             ", COMFY_URL)
+    if SKIP_COMFYUI:
+        print("COMFYUI:               ", "übersprungen (Cloud-only-Betrieb)")
+    else:
+        print("COMFY_DIR:             ", COMFY_DIR)
+        print("COMFY_MAIN_FILE:       ", COMFY_MAIN_FILE)
+        print("COMFY_PYTHON:          ", COMFY_PYTHON)
+        print("COMFY_URL:             ", COMFY_URL)
     print()
+    print("CLOUD_API_CONFIGURED:  ", "ja" if CLOUD_PROVIDER_CONFIGURED else "nein")
     print("WEBAPP_RELOAD:         ", WEBAPP_RELOAD)
     print("KEEP_COMFY_RUNNING_ON_WEBAPP_ERROR:", KEEP_COMFY_RUNNING_ON_WEBAPP_ERROR)
     print("=" * 72)
@@ -409,7 +460,12 @@ def main() -> int:
 
         ensure_port_is_free(WEBAPP_PORT, "Web-App")
 
-        if url_responds(COMFY_HEALTH_URL):
+        if SKIP_COMFYUI:
+            print(
+                "ComfyUI-Start wird übersprungen. Die Web-App startet im "
+                "Cloud-only-Betrieb."
+            )
+        elif url_responds(COMFY_HEALTH_URL):
             print(
                 f"ComfyUI läuft bereits unter {COMFY_URL} "
                 "und wird wiederverwendet."
@@ -457,11 +513,17 @@ def main() -> int:
         print("=" * 72)
         print("Alles erfolgreich gestartet.")
         print(f"Web-App: {WEBAPP_URL}")
-        print(f"ComfyUI: {COMFY_URL}")
+        if SKIP_COMFYUI:
+            print("ComfyUI: nicht gestartet (Cloud-only-Betrieb)")
+        else:
+            print(f"ComfyUI: {COMFY_URL}")
         print("=" * 72)
         print()
         print("Dieses Launcher-Fenster kann geschlossen werden.")
-        print("ComfyUI und die Web-App laufen im Hintergrund.")
+        if SKIP_COMFYUI:
+            print("Die Web-App läuft im Hintergrund.")
+        else:
+            print("ComfyUI und die Web-App laufen im Hintergrund.")
         print_log_hint()
 
         return 0

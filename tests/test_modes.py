@@ -7,6 +7,7 @@ import unittest
 
 from io import BytesIO
 from pathlib import Path
+from unittest.mock import Mock, patch
 
 from fastapi import HTTPException
 from PIL import Image
@@ -39,12 +40,232 @@ def default_components_for_mode(mode):
 
 
 class GenerationModeTests(unittest.TestCase):
+    @staticmethod
+    def make_test_image(width=640, height=640):
+        output = BytesIO()
+        Image.new("RGB", (width, height), (32, 82, 150)).save(
+            output,
+            format="PNG"
+        )
+        return output.getvalue()
+
     def test_text_to_image_is_default(self):
         self.assertEqual(module.DEFAULT_MODE, "text_to_image")
         self.assertEqual(
             set(module.MODE_CONFIGS),
             {"text_to_image", "prompt_chain"}
         )
+
+    def test_cloud_provider_disables_seed_and_separate_negative_prompt(self):
+        raw = default_components_for_mode("text_to_image")
+        components = module.normalize_prompt_components(
+            raw,
+            "text_to_image"
+        )
+
+        module.apply_provider_generation_settings(
+            components,
+            "openai",
+            "text_to_image"
+        )
+
+        generation = components["generation"]
+        self.assertEqual(generation["provider"], "openai")
+        self.assertEqual(
+            generation["model_name"],
+            module.OPENAI_IMAGE_MODEL
+        )
+        self.assertFalse(generation["fixed_seed"])
+        self.assertFalse(generation["seed_supported"])
+        self.assertFalse(generation["negative_prompt_supported"])
+        self.assertIsNone(generation["actual_seed"])
+
+    def test_public_config_never_exposes_cloud_api_key(self):
+        fake_key = "unit-test-key-value"
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": fake_key}):
+            with patch.object(
+                module,
+                "local_provider_available",
+                return_value=True
+            ):
+                response = module.public_config()
+
+        payload_text = response.body.decode("utf-8")
+        payload = json.loads(payload_text)
+        cloud = next(
+            provider
+            for provider in payload["providers"]
+            if provider["id"] == "openai"
+        )
+
+        self.assertTrue(cloud["available"])
+        self.assertNotIn(fake_key, payload_text)
+        self.assertNotIn("api_key", payload_text.lower())
+
+    def test_cloud_text_to_image_uses_configured_model_size_and_quality(self):
+        image_bytes = self.make_test_image()
+        encoded = module.base64.b64encode(image_bytes).decode("ascii")
+        response = Mock()
+        response.ok = True
+        response.status_code = 200
+        response.headers = {"x-request-id": "request-test"}
+        response.json.return_value = {
+            "data": [{"b64_json": encoded}]
+        }
+        components = default_components_for_mode("text_to_image")
+        components["aspectRatio"] = "16:9"
+
+        with patch.dict(
+            os.environ,
+            {"OPENAI_API_KEY": "unit-test-key-value"}
+        ):
+            with patch.object(
+                module.requests,
+                "post",
+                return_value=response
+            ) as post:
+                result = module.request_openai_image(
+                    prompt="A fictional adult workplace scene.",
+                    mode="text_to_image",
+                    components=components
+                )
+
+        request = post.call_args
+        self.assertEqual(
+            request.args[0],
+            "https://api.openai.com/v1/images/generations"
+        )
+        self.assertEqual(
+            request.kwargs["json"]["model"],
+            module.OPENAI_IMAGE_MODEL
+        )
+        self.assertEqual(request.kwargs["json"]["size"], "1664x928")
+        self.assertEqual(
+            request.kwargs["json"]["quality"],
+            module.OPENAI_IMAGE_QUALITY
+        )
+        self.assertEqual(request.kwargs["json"]["n"], 1)
+        self.assertEqual(
+            request.kwargs["headers"]["Authorization"],
+            "Bearer unit-test-key-value"
+        )
+
+        with Image.open(BytesIO(result)) as image:
+            self.assertEqual(image.format, "PNG")
+
+    def test_cloud_prompt_chain_uses_edit_endpoint_and_source_image(self):
+        source_bytes = self.make_test_image(1024, 1024)
+        encoded = module.base64.b64encode(source_bytes).decode("ascii")
+        response = Mock()
+        response.ok = True
+        response.status_code = 200
+        response.headers = {}
+        response.json.return_value = {
+            "data": [{"b64_json": encoded}]
+        }
+
+        with patch.dict(
+            os.environ,
+            {"OPENAI_API_KEY": "unit-test-key-value"}
+        ):
+            with patch.object(
+                module.requests,
+                "post",
+                return_value=response
+            ) as post:
+                module.request_openai_image(
+                    prompt="Preserve the subject and refine the composition.",
+                    mode="prompt_chain",
+                    components={},
+                    source_bytes=source_bytes
+                )
+
+        request = post.call_args
+        self.assertEqual(
+            request.args[0],
+            "https://api.openai.com/v1/images/edits"
+        )
+        self.assertEqual(request.kwargs["data"]["size"], "1024x1024")
+        self.assertEqual(
+            request.kwargs["data"]["model"],
+            module.OPENAI_IMAGE_MODEL
+        )
+        self.assertIn("image[]", request.kwargs["files"])
+        self.assertEqual(
+            request.kwargs["files"]["image[]"][1],
+            source_bytes
+        )
+
+    def test_cloud_request_requires_server_side_key(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(HTTPException) as raised:
+                module.request_openai_image(
+                    prompt="A fictional adult workplace scene.",
+                    mode="text_to_image",
+                    components={"aspectRatio": "1:1"}
+                )
+
+        self.assertEqual(raised.exception.status_code, 503)
+        self.assertIn("serverseitig", raised.exception.detail)
+
+    def test_cloud_run_does_not_queue_a_local_workflow(self):
+        raw = default_components_for_mode("text_to_image")
+        image_bytes = self.make_test_image(1664, 928)
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            original_generated_dir = module.GENERATED_DIR
+            original_temp_results_dir = module.TEMP_RESULTS_DIR
+
+            try:
+                module.GENERATED_DIR = Path(temporary_directory) / "generated"
+                module.TEMP_RESULTS_DIR = (
+                    Path(temporary_directory) /
+                    "temporary_results"
+                )
+                module.GENERATED_DIR.mkdir(parents=True, exist_ok=True)
+                module.TEMP_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+                module.TEMP_RESULTS.clear()
+
+                with patch.object(
+                    module,
+                    "provider_is_configured",
+                    return_value=True
+                ):
+                    with patch.object(
+                        module,
+                        "request_openai_image",
+                        return_value=image_bytes
+                    ) as cloud_request:
+                        with patch.object(
+                            module,
+                            "queue_prompt",
+                            side_effect=AssertionError(
+                                "local workflow must not be queued"
+                            )
+                        ):
+                            response = asyncio.run(
+                                module.run(
+                                    prompt_components=json.dumps(raw),
+                                    mode="text_to_image",
+                                    library_source_id="",
+                                    image_provider="openai"
+                                )
+                            )
+
+                payload = json.loads(response.body.decode("utf-8"))
+                self.assertEqual(payload["provider"], "openai")
+                self.assertIsNone(payload["prompt_id"])
+                self.assertIsNone(
+                    payload["prompt_components"]["generation"]["actual_seed"]
+                )
+                self.assertEqual(payload["submitted_negative_prompt"], "")
+                self.assertEqual(payload["results"][0]["provider"], "openai")
+                cloud_request.assert_called_once()
+            finally:
+                module.GENERATED_DIR = original_generated_dir
+                module.TEMP_RESULTS_DIR = original_temp_results_dir
+                module.TEMP_RESULTS.clear()
 
     def test_text_to_image_prompt_uses_fictional_people(self):
         raw = default_components_for_mode("text_to_image")
@@ -580,6 +801,15 @@ class GenerationModeTests(unittest.TestCase):
         self.assertNotIn('type="file"', html)
         self.assertNotIn("consentAccepted", html)
         self.assertNotIn("Eigenes Bild bearbeiten", html)
+
+    def test_cloud_key_is_never_requested_in_the_browser(self):
+        html = module.INDEX_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('id="providerPicker"', html)
+        self.assertIn('formData.append("image_provider"', html)
+        self.assertNotIn('type="password"', html)
+        self.assertNotIn('id="openaiApiKey"', html)
+        self.assertNotIn('name="OPENAI_API_KEY"', html)
 
     def test_expired_temporary_results_are_removed(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

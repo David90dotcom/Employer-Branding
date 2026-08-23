@@ -13,7 +13,7 @@
     <div>
       <h2>Employer Branding Prompt Lab</h2>
       <div class="subtitle">
-        Vom Kampagnenbriefing zum strukturierten Bildprompt – lokal generiert und menschlich geprüft
+        Vom Kampagnenbriefing zum strukturierten Bildprompt – Anbieter bewusst wählen und menschlich prüfen
       </div>
     </div>
 
@@ -31,6 +31,22 @@
       </div>
 
       <div id="modePicker" class="mode-picker"></div>
+    </div>
+
+    <div class="card provider-card">
+      <div class="section-heading">
+        <div>
+          <h3>Bildanbieter</h3>
+          <p class="mode-description">
+            Derselbe strukturierte Render-Prompt kann lokal oder über die
+            Cloud verarbeitet werden. Der API-Key bleibt ausschließlich auf
+            dem Server.
+          </p>
+        </div>
+      </div>
+
+      <div id="providerPicker" class="mode-picker provider-picker"></div>
+      <div id="providerNotice" class="provider-notice"></div>
     </div>
 
     <div id="textToImageNotice" class="card notice-card">
@@ -234,7 +250,8 @@
             <h3 id="frameworkTitle">Vom Briefing zum Render-Prompt</h3>
             <p id="frameworkDescription">
               Strategische Angaben werden zuerst in beobachtbare Bildmerkmale
-              übersetzt. Nur der kompakte Render-Prompt geht an Qwen.
+              übersetzt. Nur der kompakte Render-Prompt geht an das gewählte
+              Bildmodell.
             </p>
           </div>
           <div id="seedSummary" class="seed-summary"></div>
@@ -266,7 +283,7 @@
           <div class="output-stage-heading">
             <span id="renderStageNumber" class="stage-number">3</span>
             <div>
-              <h4 id="renderStageTitle">Render-Prompt für Qwen</h4>
+              <h4 id="renderStageTitle">Render-Prompt für das Bildmodell</h4>
               <p id="renderStageDescription">Ausschließlich visuell umsetzbare Anweisungen · wird an das Bildmodell gesendet</p>
             </div>
           </div>
@@ -275,8 +292,8 @@
 
         <div class="prompt-output-grid">
           <div class="field">
-            <label for="finalPrompt">
-              Tatsächlich an Qwen gesendeter Render-Prompt
+            <label id="finalPromptLabel" for="finalPrompt">
+              Tatsächlich an das Bildmodell gesendeter Render-Prompt
             </label>
 
             <textarea
@@ -298,7 +315,7 @@
         </div>
 
         <div id="successPanel" class="success-panel">
-          <strong>Menschliches Prüfraster · wird nicht an Qwen gesendet</strong>
+          <strong>Menschliches Prüfraster · wird nicht an das Bildmodell gesendet</strong>
           <ul id="successCriteria"></ul>
         </div>
 
@@ -355,6 +372,8 @@
 
   <script>
     const modePicker = document.getElementById("modePicker");
+    const providerPicker = document.getElementById("providerPicker");
+    const providerNotice = document.getElementById("providerNotice");
     const modeDescription = document.getElementById("modeDescription");
     const modeBadge = document.getElementById("modeBadge");
     const promptLabDescription = document.getElementById("promptLabDescription");
@@ -366,6 +385,7 @@
     const fieldsGrid = document.getElementById("fieldsGrid");
     const extraPrompt = document.getElementById("extraPrompt");
     const finalPrompt = document.getElementById("finalPrompt");
+    const finalPromptLabel = document.getElementById("finalPromptLabel");
     const negativePrompt = document.getElementById("negativePrompt");
     const negativePromptField = document.getElementById("negativePromptField");
     const frameworkTitle = document.getElementById("frameworkTitle");
@@ -410,6 +430,8 @@
     let lastNegativePrompt = "";
     let currentMode = "text_to_image";
     let availableModes = [];
+    let currentProvider = "local";
+    let availableProviders = [];
     let selectedLibrarySource = null;
     let libraryItems = [];
 
@@ -506,6 +528,150 @@
     }
 
 
+    function getCurrentProvider() {
+      return availableProviders.find(
+        provider => provider.id === currentProvider
+      );
+    }
+
+
+    function renderProviderButtons() {
+      providerPicker.replaceChildren();
+
+      for (const provider of availableProviders) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "mode-option provider-option";
+        button.dataset.provider = provider.id;
+        button.disabled = !provider.available;
+
+        const content = document.createElement("span");
+        content.className = "provider-option-content";
+
+        const label = document.createElement("strong");
+        label.textContent = provider.label;
+
+        const model = document.createElement("small");
+        model.textContent = provider.model_name || "Bildmodell";
+
+        const state = document.createElement("span");
+        state.textContent = provider.available ? "bereit" : "nicht bereit";
+
+        content.append(label, model);
+        button.append(content, state);
+        button.title = provider.available
+          ? provider.description || ""
+          : provider.disabled_reason || "Anbieter nicht verfügbar";
+        button.addEventListener("click", () => selectProvider(provider.id));
+        providerPicker.appendChild(button);
+      }
+    }
+
+
+    function updateRunButtonState() {
+      const mode = availableModes.find(item => item.id === currentMode);
+      const provider = getCurrentProvider();
+      const sourceMissing = Boolean(
+        mode?.requires_library_source && !selectedLibrarySource
+      );
+
+      runButton.disabled = sourceMissing || !provider?.available;
+    }
+
+
+    function applyProviderUi() {
+      const provider = getCurrentProvider();
+      const isTextToImage = currentMode === "text_to_image";
+
+      for (const button of providerPicker.querySelectorAll(".provider-option")) {
+        button.classList.toggle(
+          "active",
+          button.dataset.provider === currentProvider
+        );
+      }
+
+      if (!provider) {
+        providerNotice.textContent = "Kein Bildanbieter konfiguriert.";
+        providerNotice.className = "provider-notice provider-warning";
+        updateRunButtonState();
+        return;
+      }
+
+      if (!provider.available) {
+        providerNotice.textContent = (
+          provider.disabled_reason || "Dieser Bildanbieter ist nicht verfügbar."
+        );
+        providerNotice.className = "provider-notice provider-warning";
+      }
+
+      comparisonSettings.hidden = !provider.supports_seed;
+      fixedSeed.disabled = (
+        !provider.supports_seed || !fixedSeedEnabled.checked
+      );
+      negativePromptField.hidden = !(
+        isTextToImage && provider.supports_negative_prompt
+      );
+
+      const modelLabel = provider.model_name || provider.label;
+      finalPromptLabel.textContent = (
+        `Tatsächlich an ${modelLabel} gesendeter Render-Prompt`
+      );
+
+      if (!provider.available) {
+        renderStageTitle.textContent = "Render-Prompt für das Bildmodell";
+      } else if (provider.id === "openai") {
+        providerNotice.textContent = (
+          "Cloud-Verarbeitung: Render-Prompt und bei Stufe 2 das gespeicherte " +
+          "synthetische Ausgangsbild werden an die Images API übertragen. " +
+          "Der API-Key bleibt serverseitig. Eine feste Seed-Steuerung und ein " +
+          "separater Negative Prompt stehen hier nicht zur Verfügung. " +
+          "API-Aufrufe können kostenpflichtig sein."
+        );
+        providerNotice.className = "provider-notice provider-cloud";
+        renderStageTitle.textContent = isTextToImage
+          ? `Render-Prompt für ${modelLabel}`
+          : `Optimierungs-Prompt für ${modelLabel}`;
+      } else {
+        providerNotice.textContent = (
+          "Lokale Verarbeitung: Prompt und synthetische Bilddaten bleiben " +
+          "im lokalen ComfyUI-Workflow. Seed und separater Negative Prompt " +
+          "können für kontrollierte Vergleiche verwendet werden."
+        );
+        providerNotice.className = "provider-notice provider-local";
+        renderStageTitle.textContent = isTextToImage
+          ? "Render-Prompt für Qwen"
+          : "Optimierungs-Prompt für Qwen Edit";
+      }
+
+      updateRunButtonState();
+    }
+
+
+    async function selectProvider(providerId) {
+      const provider = availableProviders.find(
+        item => item.id === providerId
+      );
+
+      if (!provider) {
+        throw new Error(`Unbekannter Bildanbieter: ${providerId}`);
+      }
+
+      if (!provider.available) {
+        setStatus(provider.disabled_reason || "Bildanbieter nicht verfügbar.");
+        return;
+      }
+
+      currentProvider = provider.id;
+      applyProviderUi();
+
+      if (fieldsGrid.children.length) {
+        await requestPromptPreview();
+      }
+
+      setStatus(`${provider.label} ist ausgewählt.`);
+    }
+
+
     function updateChainSourceCard() {
       const mode = availableModes.find(item => item.id === currentMode);
       const requiresLibrarySource = Boolean(mode?.requires_library_source);
@@ -536,11 +702,9 @@
       const isTextToImage = mode.id === "text_to_image";
 
       textToImageNotice.hidden = !isTextToImage;
-      comparisonSettings.hidden = false;
       mandatoryConstraints.hidden = false;
       promptSections.hidden = false;
       successPanel.hidden = false;
-      negativePromptField.hidden = !isTextToImage;
       briefingStage.hidden = !isTextToImage;
       translationStage.hidden = !isTextToImage;
 
@@ -549,7 +713,7 @@
         promptLabDescription.textContent = (
           "Die Auswahlfelder bilden zuerst das Kampagnenbriefing. Abstrakte " +
           "Ziele werden anschließend in beobachtbare Bildmerkmale übersetzt; " +
-          "nur der daraus gebildete Render-Prompt geht an Qwen."
+          "nur der daraus gebildete Render-Prompt geht an den gewählten Anbieter."
         );
         frameworkTitle.textContent = "Vom Briefing zum Render-Prompt";
         frameworkDescription.textContent = (
@@ -557,7 +721,7 @@
           "bleiben klar voneinander getrennt."
         );
         renderStageNumber.textContent = "3";
-        renderStageTitle.textContent = "Render-Prompt für Qwen";
+        renderStageTitle.textContent = "Render-Prompt für das Bildmodell";
         renderStageDescription.textContent = (
           "Ausschließlich visuell umsetzbare Anweisungen · wird an das " +
           "Bildmodell gesendet"
@@ -576,7 +740,7 @@
           "bleibt davon getrennt."
         );
         renderStageNumber.textContent = "2";
-        renderStageTitle.textContent = "Optimierungs-Prompt für Qwen Edit";
+        renderStageTitle.textContent = "Optimierungs-Prompt für das Bildmodell";
         renderStageDescription.textContent = (
           "Gezielte visuelle Änderung des gespeicherten synthetischen " +
           "Ausgangsbildes"
@@ -587,7 +751,6 @@
         ? "Kampagnenmotiv gezielt optimieren"
         : "Bild generieren";
 
-      runButton.disabled = requiresLibrarySource && !selectedLibrarySource;
       updateChainSourceCard();
 
       for (const button of modePicker.querySelectorAll(".mode-option")) {
@@ -596,6 +759,8 @@
           button.dataset.mode === currentMode
         );
       }
+
+      applyProviderUi();
 
       gallery.replaceChildren();
       finalPrompt.value = "";
@@ -608,6 +773,8 @@
       setProgress(0);
 
       await loadUiFields();
+
+      updateRunButtonState();
 
       if (requiresLibrarySource && !selectedLibrarySource) {
         setStatus(
@@ -637,8 +804,15 @@
         throw new Error("Die Serverkonfiguration enthält keine Modi.");
       }
 
+      if (!Array.isArray(data?.providers) || !data.providers.length) {
+        throw new Error("Die Serverkonfiguration enthält keine Bildanbieter.");
+      }
+
       availableModes = data.modes;
+      availableProviders = data.providers;
+      currentProvider = data.default_provider || availableProviders[0].id;
       renderModeButtons();
+      renderProviderButtons();
       await selectMode(data.default_mode || availableModes[0].id);
 
       try {
@@ -672,7 +846,9 @@
         lines.push("");
       }
 
-      lines.push("An Qwen gesendeter Render-Prompt:");
+      const provider = getCurrentProvider();
+      const modelLabel = provider?.model_name || provider?.label || "Bildmodell";
+      lines.push(`An ${modelLabel} gesendeter Render-Prompt:`);
       lines.push(prompt || "");
 
       if (negative) {
@@ -734,10 +910,7 @@
       ) {
         selectedLibrarySource = null;
         updateChainSourceCard();
-
-        if (currentMode === "prompt_chain") {
-          runButton.disabled = true;
-        }
+        updateRunButtonState();
       }
 
       renderCampaignLibrary();
@@ -767,12 +940,18 @@
         const modeLabel = item.mode === "prompt_chain"
           ? "Prompt Chain · Optimierung"
           : "Text-to-Image";
+        const providerLabel = item.provider === "openai"
+          ? "Cloud"
+          : "Lokal";
         meta.textContent = [
           modeLabel,
+          providerLabel,
           formatSavedDate(item.saved_at),
           item.seed !== null && item.seed !== undefined
             ? `Seed ${item.seed}`
-            : "zufälliger Seed"
+            : item.provider === "openai"
+              ? "ohne Seedsteuerung"
+              : "zufälliger Seed"
         ].join(" · ");
 
         const actions = document.createElement("div");
@@ -828,7 +1007,7 @@
             updateChainSourceCard();
 
             if (currentMode === "prompt_chain") {
-              runButton.disabled = true;
+              updateRunButtonState();
               setStatus(
                 "Das ausgewählte Ausgangsbild wurde gelöscht. Bitte ein anderes Bibliotheksbild auswählen."
               );
@@ -851,7 +1030,11 @@
           item.positive_prompt || "–",
           "",
           "NEGATIVE PROMPT",
-          item.negative_prompt || "–",
+          item.negative_prompt || (
+            item.provider === "openai"
+              ? "– (vom Cloud-Anbieter nicht separat unterstützt)"
+              : "–"
+          ),
           "",
           `MODELL: ${item.model_name}`,
           `FORMAT: ${item.width} × ${item.height}`
@@ -1023,8 +1206,12 @@
 
       components.extraPrompt = extraPrompt.value.trim();
       components.banner = collectBannerSettings();
+      const provider = getCurrentProvider();
       components.generation = {
-        fixed_seed: Boolean(fixedSeedEnabled.checked),
+        provider: currentProvider,
+        fixed_seed: Boolean(
+          provider?.supports_seed && fixedSeedEnabled.checked
+        ),
         seed: Number.parseInt(fixedSeed.value, 10)
       };
 
@@ -1096,7 +1283,9 @@
 
       const generation = data?.components?.generation || {};
 
-      if (generation.actual_seed !== undefined) {
+      if (generation.seed_supported === false) {
+        seedSummary.textContent = "Seed-Steuerung: nicht verfügbar";
+      } else if (generation.actual_seed !== undefined) {
         seedSummary.textContent = `Verwendeter Seed: ${generation.actual_seed}`;
       } else if (currentMode === "text_to_image" && generation.fixed_seed) {
         seedSummary.textContent = `Vergleichs-Seed: ${generation.seed}`;
@@ -1120,6 +1309,7 @@
             cache: "no-store",
             body: JSON.stringify({
               mode: currentMode,
+              provider: currentProvider,
               components
             })
           }
@@ -1134,7 +1324,9 @@
         }
 
         lastServerPrompt = data?.positive_prompt || data?.prompt || "";
-        lastNegativePrompt = data?.negative_prompt || "";
+        lastNegativePrompt = getCurrentProvider()?.supports_negative_prompt
+          ? data?.negative_prompt || ""
+          : "";
         finalPrompt.value = lastServerPrompt;
         negativePrompt.value = lastNegativePrompt;
 
@@ -1596,7 +1788,10 @@
     );
 
     function updateSeedState() {
-      fixedSeed.disabled = !fixedSeedEnabled.checked;
+      fixedSeed.disabled = (
+        !getCurrentProvider()?.supports_seed ||
+        !fixedSeedEnabled.checked
+      );
       schedulePromptPreview();
     }
 
@@ -1675,7 +1870,17 @@
 
     runButton.addEventListener("click", async () => {
       const mode = availableModes.find(item => item.id === currentMode);
+      const provider = getCurrentProvider();
       const requiresLibrarySource = Boolean(mode?.requires_library_source);
+
+      if (!provider?.available) {
+        alert(
+          provider?.disabled_reason ||
+          "Bitte zuerst einen verfügbaren Bildanbieter auswählen."
+        );
+        updateRunButtonState();
+        return;
+      }
 
       if (requiresLibrarySource && !selectedLibrarySource) {
         alert("Bitte zuerst ein Bild aus der Kampagnenbibliothek auswählen.");
@@ -1716,13 +1921,14 @@
       setProgress(0);
       setStatus(
         requiresLibrarySource
-          ? "Kontrollierte Kampagnenoptimierung wird vorbereitet ..."
-          : "Generierung wird vorbereitet ..."
+          ? `Kontrollierte Kampagnenoptimierung über ${provider.label} wird vorbereitet ...`
+          : `Generierung über ${provider.label} wird vorbereitet ...`
       );
 
       const formData = new FormData();
 
       formData.append("mode", currentMode);
+      formData.append("image_provider", currentProvider);
 
       if (requiresLibrarySource && selectedLibrarySource) {
         formData.append(
@@ -1820,7 +2026,7 @@
         );
 
       } finally {
-        runButton.disabled = requiresLibrarySource && !selectedLibrarySource;
+        updateRunButtonState();
       }
     });
 
@@ -1830,7 +2036,10 @@
     // ------------------------------------------------------------
 
     updateBannerVisibility();
-    fixedSeed.disabled = !fixedSeedEnabled.checked;
+    fixedSeed.disabled = (
+      !getCurrentProvider()?.supports_seed ||
+      !fixedSeedEnabled.checked
+    );
 
     loadApplicationConfig().catch(error => {
       console.error("Initialisierungsfehler:", error);

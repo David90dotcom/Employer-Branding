@@ -2,6 +2,9 @@ from fastapi import FastAPI, HTTPException, Form, Body, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+import asyncio
+import base64
+import binascii
 import json
 import os
 import sqlite3
@@ -19,11 +22,30 @@ from urllib.parse import urlencode
 from PIL import Image, ImageDraw, ImageFont
 
 
-COMFY = "http://127.0.0.1:8188"
-
 BASE_DIR = Path(__file__).resolve().parent
 MODEL_CONFIG_PATH = BASE_DIR / "model_config.json"
 INDEX_PATH = BASE_DIR / "static" / "index.html"
+
+COMFY = os.getenv(
+    "EMPLOYER_BRANDING_COMFY_URL",
+    "http://127.0.0.1:8188"
+).strip().rstrip("/")
+
+OPENAI_IMAGES_URL = "https://api.openai.com/v1/images"
+OPENAI_IMAGE_MODEL = (
+    os.getenv("OPENAI_IMAGE_MODEL", "gpt-image-2").strip() or
+    "gpt-image-2"
+)
+OPENAI_IMAGE_QUALITY = (
+    os.getenv("OPENAI_IMAGE_QUALITY", "medium").strip().lower() or
+    "medium"
+)
+OPENAI_IMAGE_TIMEOUT_SECONDS = 180
+
+if OPENAI_IMAGE_QUALITY not in {"low", "medium", "high", "auto"}:
+    raise RuntimeError(
+        "OPENAI_IMAGE_QUALITY must be low, medium, high, or auto."
+    )
 
 GENERATED_DIR = BASE_DIR / "static" / "generated"
 GENERATED_DIR.mkdir(parents=True, exist_ok=True)
@@ -132,6 +154,39 @@ OUTPUT_FORMATS = {
     "3:4": "Photorealistic vertical 3:4 campaign image."
 }
 
+IMAGE_PROVIDERS = {
+    "local": {
+        "label": "Lokal · Qwen / ComfyUI",
+        "description": (
+            "Verarbeitet Render-Prompt und Bilddaten ausschließlich über "
+            "die lokal erreichbare ComfyUI-Instanz."
+        ),
+        "supports_seed": True,
+        "supports_negative_prompt": True,
+        "is_cloud": False
+    },
+    "openai": {
+        "label": "Cloud · OpenAI Images API",
+        "description": (
+            "Sendet den Render-Prompt und bei Stufe 2 das synthetische "
+            "Ausgangsbild an die OpenAI Images API."
+        ),
+        "supports_seed": False,
+        "supports_negative_prompt": False,
+        "is_cloud": True
+    }
+}
+
+DEFAULT_IMAGE_PROVIDER = os.getenv(
+    "EMPLOYER_BRANDING_IMAGE_PROVIDER",
+    "local"
+).strip().lower()
+
+if DEFAULT_IMAGE_PROVIDER not in IMAGE_PROVIDERS:
+    raise RuntimeError(
+        "EMPLOYER_BRANDING_IMAGE_PROVIDER must be local or openai."
+    )
+
 TEXT_TO_IMAGE_NEGATIVE_PROMPT = (
     "low resolution, low quality, distorted anatomy, malformed hands, "
     "extra fingers, duplicated people, oversaturated colors, waxy skin, "
@@ -161,6 +216,99 @@ def normalize_mode(mode):
         )
 
     return normalized
+
+
+def get_openai_api_key():
+    """Read the key only when needed so it never enters public config."""
+    return os.getenv("OPENAI_API_KEY", "").strip()
+
+
+def local_provider_available():
+    try:
+        response = requests.get(
+            f"{COMFY}/system_stats",
+            timeout=1.5
+        )
+        return response.ok
+    except requests.RequestException:
+        return False
+
+
+def provider_is_configured(provider):
+    normalized = str(provider or "").strip().lower()
+
+    if normalized == "openai":
+        return bool(get_openai_api_key())
+
+    if normalized == "local":
+        return local_provider_available()
+
+    return False
+
+
+def normalize_image_provider(provider, require_configured=False):
+    raw_provider = (
+        provider
+        if isinstance(provider, str)
+        else DEFAULT_IMAGE_PROVIDER
+    )
+    normalized = str(raw_provider or DEFAULT_IMAGE_PROVIDER).strip().lower()
+
+    if normalized not in IMAGE_PROVIDERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown image provider: {normalized}"
+        )
+
+    if require_configured and not provider_is_configured(normalized):
+        if normalized == "openai":
+            detail = (
+                "Der Cloud-Anbieter ist nicht konfiguriert. Hinterlege "
+                "OPENAI_API_KEY serverseitig in der lokalen .env-Datei "
+                "oder als Umgebungsvariable und starte die App neu."
+            )
+        else:
+            detail = (
+                "ComfyUI ist unter der konfigurierten lokalen Adresse "
+                "nicht erreichbar."
+            )
+
+        raise HTTPException(status_code=503, detail=detail)
+
+    return normalized
+
+
+def resolve_provider_model_name(provider, mode=DEFAULT_MODE):
+    normalized_provider = normalize_image_provider(provider)
+
+    if normalized_provider == "openai":
+        return OPENAI_IMAGE_MODEL
+
+    return resolve_mode_model_name(mode)
+
+
+def apply_provider_generation_settings(components, provider, mode):
+    normalized_provider = normalize_image_provider(provider)
+    generation = components.setdefault("generation", {})
+    provider_config = IMAGE_PROVIDERS[normalized_provider]
+
+    generation["provider"] = normalized_provider
+    generation["model_name"] = resolve_provider_model_name(
+        normalized_provider,
+        mode
+    )
+    generation["seed_supported"] = bool(
+        provider_config["supports_seed"]
+    )
+    generation["negative_prompt_supported"] = bool(
+        provider_config["supports_negative_prompt"]
+    )
+
+    if not provider_config["supports_seed"]:
+        generation["fixed_seed"] = False
+        generation["actual_seed"] = None
+
+    return components
 
 
 def get_mode_config(mode):
@@ -335,7 +483,20 @@ def register_temporary_result(display_bytes, source_bytes, metadata):
         "view_url": f"/api/results/{result_id}/image",
         "saved": False,
         "mode": entry.get("mode", DEFAULT_MODE),
-        "parent_id": entry.get("parent_id")
+        "parent_id": entry.get("parent_id"),
+        "provider": entry.get(
+            "provider",
+            entry.get("components", {}).get("generation", {}).get(
+                "provider",
+                "local"
+            )
+        ),
+        "model_name": entry.get(
+            "model_name",
+            entry.get("components", {}).get("generation", {}).get(
+                "model_name"
+            )
+        )
     }
 
 
@@ -376,6 +537,10 @@ def serialize_library_row(row):
         "positive_prompt": row["positive_prompt"],
         "negative_prompt": row["negative_prompt"],
         "components": components,
+        "provider": components.get("generation", {}).get(
+            "provider",
+            "local"
+        ),
         "seed": row["seed"],
         "model_name": row["model_name"],
         "width": row["width"],
@@ -493,7 +658,11 @@ def persist_temporary_result(raw_result_id, title=""):
     if seed is None and generation.get("fixed_seed"):
         seed = generation.get("seed")
     mode = entry.get("mode", DEFAULT_MODE)
-    model_name = resolve_mode_model_name(mode)
+    model_name = (
+        entry.get("model_name") or
+        generation.get("model_name") or
+        resolve_mode_model_name(mode)
+    )
 
     with library_connection() as connection:
         connection.execute(
@@ -2138,6 +2307,231 @@ def render_ai_overlay_on_image(image_bytes):
 
 
 # ---------------------------------------------------------------------------
+# Cloud Images API
+# ---------------------------------------------------------------------------
+
+def openai_size_is_valid(width, height):
+    return (
+        width > 0 and
+        height > 0 and
+        width <= 3840 and
+        height <= 3840 and
+        width % 16 == 0 and
+        height % 16 == 0 and
+        max(width, height) / min(width, height) <= 3 and
+        655_360 <= width * height <= 8_294_400
+    )
+
+
+def resolve_openai_image_size(mode, components, source_bytes=None):
+    if mode == "text_to_image":
+        generation = get_mode_config(mode).get("generation", {})
+        aspect_ratio = components.get(
+            "aspectRatio",
+            generation.get("default_aspect_ratio", "1:1")
+        )
+        dimensions = generation.get("aspect_ratios", {}).get(aspect_ratio)
+
+        if dimensions and openai_size_is_valid(
+            int(dimensions[0]),
+            int(dimensions[1])
+        ):
+            return f"{int(dimensions[0])}x{int(dimensions[1])}"
+
+        return "auto"
+
+    if source_bytes:
+        try:
+            with Image.open(BytesIO(source_bytes)) as image:
+                width, height = image.size
+
+            if openai_size_is_valid(width, height):
+                return f"{width}x{height}"
+        except (OSError, ValueError):
+            pass
+
+    return "auto"
+
+
+def normalize_openai_image_bytes(encoded_image):
+    if not encoded_image or not isinstance(encoded_image, str):
+        raise HTTPException(
+            status_code=502,
+            detail="Der Cloud-Anbieter hat keine Bilddaten zurückgegeben."
+        )
+
+    try:
+        decoded = base64.b64decode(encoded_image, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Die Cloud-Bildantwort war nicht gültig kodiert."
+        ) from exc
+
+    try:
+        with Image.open(BytesIO(decoded)) as image:
+            normalized = image.convert("RGB")
+            output = BytesIO()
+            normalized.save(output, format="PNG", optimize=True)
+            return output.getvalue()
+    except (OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Die Cloud-Antwort enthielt keine gültige Bilddatei."
+        ) from exc
+
+
+def raise_openai_api_error(response):
+    request_id = str(response.headers.get("x-request-id", "") or "").strip()
+    error_code = ""
+
+    try:
+        payload = response.json()
+        error = payload.get("error", {}) if isinstance(payload, dict) else {}
+        error_code = str(error.get("code", "") or "").strip()
+    except (ValueError, TypeError):
+        error_code = ""
+
+    suffix = f" Referenz: {request_id}." if request_id else ""
+
+    if error_code == "moderation_blocked":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Die Cloud-Bildanfrage wurde durch eine Sicherheitsprüfung "
+                "abgelehnt. Bitte die visuellen Angaben neutraler und "
+                f"eindeutiger formulieren.{suffix}"
+            )
+        )
+
+    if response.status_code in {401, 403}:
+        detail = (
+            "Der Cloud-Zugriff wurde abgelehnt. Bitte API-Key, Projektzugriff "
+            f"und gegebenenfalls die Organisationsverifizierung prüfen.{suffix}"
+        )
+    elif response.status_code == 429:
+        detail = (
+            "Das Cloud-Kontingent oder ein API-Limit wurde erreicht. Bitte "
+            f"Nutzung und Abrechnung im API-Projekt prüfen.{suffix}"
+        )
+    elif 500 <= response.status_code < 600:
+        detail = (
+            "Der Cloud-Bilddienst ist vorübergehend nicht verfügbar. Bitte "
+            f"später erneut versuchen.{suffix}"
+        )
+    else:
+        code_suffix = f" ({error_code})" if error_code else ""
+        detail = (
+            "Die Cloud-Bildanfrage konnte nicht verarbeitet werden"
+            f"{code_suffix}.{suffix}"
+        )
+
+    raise HTTPException(status_code=502, detail=detail)
+
+
+def request_openai_image(prompt, mode, components, source_bytes=None):
+    api_key = get_openai_api_key()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "OPENAI_API_KEY ist serverseitig nicht konfiguriert. "
+                "Der Schlüssel darf nicht in die Browseroberfläche eingegeben "
+                "oder in das Repository übernommen werden."
+            )
+        )
+
+    image_size = resolve_openai_image_size(
+        mode,
+        components,
+        source_bytes=source_bytes
+    )
+    headers = {
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    try:
+        if mode == "text_to_image":
+            response = requests.post(
+                f"{OPENAI_IMAGES_URL}/generations",
+                headers={
+                    **headers,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": OPENAI_IMAGE_MODEL,
+                    "prompt": prompt,
+                    "n": 1,
+                    "size": image_size,
+                    "quality": OPENAI_IMAGE_QUALITY
+                },
+                timeout=OPENAI_IMAGE_TIMEOUT_SECONDS
+            )
+        else:
+            if not source_bytes:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cloud image editing requires a source image."
+                )
+
+            if len(source_bytes) >= 50 * 1024 * 1024:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Das Ausgangsbild überschreitet das 50-MB-Limit."
+                )
+
+            response = requests.post(
+                f"{OPENAI_IMAGES_URL}/edits",
+                headers=headers,
+                data={
+                    "model": OPENAI_IMAGE_MODEL,
+                    "prompt": prompt,
+                    "size": image_size,
+                    "quality": OPENAI_IMAGE_QUALITY
+                },
+                files={
+                    "image[]": (
+                        "synthetic-campaign-source.png",
+                        source_bytes,
+                        "image/png"
+                    )
+                },
+                timeout=OPENAI_IMAGE_TIMEOUT_SECONDS
+            )
+    except requests.Timeout as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "Die Cloud-Bildgenerierung hat das Zeitlimit überschritten. "
+                "Es wurde kein API-Key protokolliert."
+            )
+        ) from exc
+    except requests.RequestException as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Der Cloud-Bilddienst ist momentan nicht erreichbar. "
+                "Bitte Netzwerkverbindung und API-Konfiguration prüfen."
+            )
+        ) from exc
+
+    if not response.ok:
+        raise_openai_api_error(response)
+
+    try:
+        payload = response.json()
+        encoded_image = payload["data"][0]["b64_json"]
+    except (ValueError, KeyError, IndexError, TypeError) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Die Cloud-Bildantwort hatte ein unerwartetes Format."
+        ) from exc
+
+    return normalize_openai_image_bytes(encoded_image)
+
+
+# ---------------------------------------------------------------------------
 # ComfyUI
 # ---------------------------------------------------------------------------
 
@@ -2358,6 +2752,10 @@ def root():
 @app.get("/api/config")
 def public_config():
     modes = []
+    provider_availability = {
+        provider_name: provider_is_configured(provider_name)
+        for provider_name in IMAGE_PROVIDERS
+    }
 
     for mode_name, mode_config in MODE_CONFIGS.items():
         modes.append({
@@ -2369,10 +2767,59 @@ def public_config():
             )
         })
 
+    providers = []
+
+    for provider_name, provider_config in IMAGE_PROVIDERS.items():
+        configured = provider_availability[provider_name]
+
+        if configured:
+            disabled_reason = ""
+        elif provider_name == "openai":
+            disabled_reason = (
+                "OPENAI_API_KEY fehlt in der serverseitigen Konfiguration."
+            )
+        else:
+            disabled_reason = "ComfyUI ist derzeit nicht erreichbar."
+
+        providers.append({
+            "id": provider_name,
+            "label": provider_config["label"],
+            "description": provider_config["description"],
+            "available": configured,
+            "configured": configured,
+            "disabled_reason": disabled_reason,
+            "supports_seed": bool(provider_config["supports_seed"]),
+            "supports_negative_prompt": bool(
+                provider_config["supports_negative_prompt"]
+            ),
+            "is_cloud": bool(provider_config["is_cloud"]),
+            "model_name": resolve_provider_model_name(
+                provider_name,
+                DEFAULT_MODE
+            )
+        })
+
+    effective_default_provider = DEFAULT_IMAGE_PROVIDER
+
+    if not provider_availability[effective_default_provider]:
+        available_provider = next(
+            (
+                provider["id"]
+                for provider in providers
+                if provider["available"]
+            ),
+            None
+        )
+
+        if available_provider:
+            effective_default_provider = available_provider
+
     return JSONResponse(
         content={
             "default_mode": DEFAULT_MODE,
-            "modes": modes
+            "modes": modes,
+            "default_provider": effective_default_provider,
+            "providers": providers
         },
         headers=no_cache_headers()
     )
@@ -2488,14 +2935,19 @@ def progress():
 @app.post("/api/preview-prompt")
 async def preview_prompt(payload: dict = Body(...)):
     mode = normalize_mode(payload.get("mode", DEFAULT_MODE))
+    provider = normalize_image_provider(
+        payload.get("provider", DEFAULT_IMAGE_PROVIDER)
+    )
     raw_components = payload.get("components", payload)
 
     components = normalize_prompt_components(raw_components, mode)
+    apply_provider_generation_settings(components, provider, mode)
     prompt_package = build_prompt_package(components, mode)
 
     return JSONResponse(
         content={
             "mode": mode,
+            "provider": provider,
             "prompt": prompt_package["positive_prompt"],
             "positive_prompt": prompt_package["positive_prompt"],
             "render_prompt": prompt_package["render_prompt"],
@@ -2515,9 +2967,13 @@ async def preview_prompt(payload: dict = Body(...)):
 async def run(
     prompt_components: str = Form(...),
     mode: str = Form(DEFAULT_MODE),
-    library_source_id: str = Form("")
+    library_source_id: str = Form(""),
+    image_provider: str = Form(DEFAULT_IMAGE_PROVIDER)
 ):
     normalized_mode = normalize_mode(mode)
+    normalized_provider = normalize_image_provider(
+        image_provider
+    )
     mode_config = get_mode_config(normalized_mode)
 
     try:
@@ -2530,6 +2986,11 @@ async def run(
 
     components = normalize_prompt_components(
         raw_components,
+        normalized_mode
+    )
+    apply_provider_generation_settings(
+        components,
+        normalized_provider,
         normalized_mode
     )
 
@@ -2574,9 +3035,15 @@ async def run(
             detail="Prompt is empty"
         )
 
+    normalize_image_provider(
+        normalized_provider,
+        require_configured=True
+    )
+
     if DEBUG_PROMPTS:
         print("\n" + "=" * 100)
         print("GENERATION MODE:", normalized_mode)
+        print("IMAGE PROVIDER:", normalized_provider)
         print("PROMPT COMPONENTS:")
         print(json.dumps(components, indent=2, ensure_ascii=False))
         print("FINAL SERVER PROMPT:")
@@ -2584,6 +3051,7 @@ async def run(
         print("=" * 100 + "\n")
 
     stored_image_name = None
+    source_input_bytes = None
 
     if mode_config.get("requires_library_source"):
         source_path = (
@@ -2597,66 +3065,90 @@ async def run(
                 detail="The saved source image is no longer available."
             )
 
-        image_bytes = source_path.read_bytes()
-        safe_filename = source_path.name
-        stored_image_name = comfy_upload_image(
-            image_bytes,
-            safe_filename
-        )
-
-    workflow = deep_copy_workflow(normalized_mode)
-
-    workflow = patch_workflow(
-        workflow=workflow,
-        mode=normalized_mode,
-        prompt=final_prompt,
-        components=components,
-        image_name=stored_image_name,
-        negative_prompt=negative_prompt
-    )
-
-    if normalized_mode == "text_to_image":
-        sampler_node = get_mode_config(normalized_mode)["nodes"]["sampler"]
-        actual_seed = workflow[sampler_node]["inputs"]["seed"]
-    else:
-        actual_seed = workflow["433:3"]["inputs"]["seed"]
-
-    components.setdefault("generation", {})["actual_seed"] = actual_seed
+        source_input_bytes = source_path.read_bytes()
 
     progress_state["value"] = 0
+    prompt_id = None
+    source_images = []
 
-    prompt_id = queue_prompt(workflow)
+    if normalized_provider == "local":
+        if source_input_bytes is not None:
+            stored_image_name = comfy_upload_image(
+                source_input_bytes,
+                source_path.name
+            )
 
-    threading.Thread(
-        target=track_progress,
-        args=(prompt_id,),
-        daemon=True
-    ).start()
+        workflow = deep_copy_workflow(normalized_mode)
 
-    images = wait_for_result(prompt_id)
+        workflow = patch_workflow(
+            workflow=workflow,
+            mode=normalized_mode,
+            prompt=final_prompt,
+            components=components,
+            image_name=stored_image_name,
+            negative_prompt=negative_prompt
+        )
+
+        if normalized_mode == "text_to_image":
+            sampler_node = get_mode_config(normalized_mode)["nodes"]["sampler"]
+            actual_seed = workflow[sampler_node]["inputs"]["seed"]
+        else:
+            actual_seed = workflow["433:3"]["inputs"]["seed"]
+
+        components.setdefault("generation", {})["actual_seed"] = actual_seed
+
+        prompt_id = queue_prompt(workflow)
+
+        threading.Thread(
+            target=track_progress,
+            args=(prompt_id,),
+            daemon=True
+        ).start()
+
+        images = wait_for_result(prompt_id)
+
+        for image in images:
+            query = urlencode({
+                "filename": image["filename"],
+                "subfolder": image.get("subfolder", ""),
+                "type": image["type"]
+            })
+
+            response = requests.get(
+                f"{COMFY}/view?{query}",
+                timeout=60
+            )
+            response.raise_for_status()
+            source_images.append(response.content)
+    else:
+        components.setdefault("generation", {})["actual_seed"] = None
+        progress_state["value"] = 10
+        source_images.append(
+            await asyncio.to_thread(
+                request_openai_image,
+                prompt=final_prompt,
+                mode=normalized_mode,
+                components=components,
+                source_bytes=source_input_bytes
+            )
+        )
+        progress_state["value"] = 90
 
     results = []
     view_urls = []
 
     banner = components.get("banner", {})
+    submitted_negative_prompt = (
+        negative_prompt
+        if IMAGE_PROVIDERS[normalized_provider]["supports_negative_prompt"]
+        else ""
+    )
+    model_name = resolve_provider_model_name(
+        normalized_provider,
+        normalized_mode
+    )
 
-    for image in images:
-        query = urlencode({
-            "filename": image["filename"],
-            "subfolder": image.get("subfolder", ""),
-            "type": image["type"]
-        })
-
-        comfy_view_url = f"{COMFY}/view?{query}"
-
-        response = requests.get(
-            comfy_view_url,
-            timeout=60
-        )
-
-        response.raise_for_status()
-
-        source_image_bytes = response.content
+    for source_image_bytes in source_images:
         display_image_bytes = source_image_bytes
 
         if banner.get("enabled"):
@@ -2680,20 +3172,26 @@ async def run(
                     else None
                 ),
                 "positive_prompt": final_prompt,
-                "negative_prompt": negative_prompt,
+                "negative_prompt": submitted_negative_prompt,
+                "provider": normalized_provider,
+                "model_name": model_name,
                 "components": components
             }
         )
         results.append(result)
         view_urls.append(result["view_url"])
 
+    progress_state["value"] = 100
+
     return JSONResponse(
         content={
             "mode": normalized_mode,
+            "provider": normalized_provider,
+            "model_name": model_name,
             "prompt_id": prompt_id,
             "submitted_prompt": final_prompt,
             "submitted_render_prompt": final_prompt,
-            "submitted_negative_prompt": negative_prompt,
+            "submitted_negative_prompt": submitted_negative_prompt,
             "prompt_sections": prompt_package["sections"],
             "render_sections": prompt_package["render_sections"],
             "briefing_sections": prompt_package["briefing_sections"],

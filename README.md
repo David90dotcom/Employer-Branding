@@ -1,6 +1,8 @@
 # Employer-Branding Image Studio
 
-Lokaler Prototyp zur standardisierten Erstellung von Employer-Branding-Bildmotiven mit ComfyUI.
+Prototyp zur standardisierten Erstellung von Employer-Branding-Bildmotiven.
+Als Bildanbieter stehen der lokale ComfyUI-Workflow und optional die OpenAI
+Images API zur Verfügung.
 
 ## Modi
 
@@ -13,6 +15,31 @@ Lokaler Prototyp zur standardisierten Erstellung von Employer-Branding-Bildmotiv
 Ein separater Upload- oder Image-to-Image-Modus für reale Personenbilder ist
 nicht Bestandteil der aktuellen Anwendung. Beide Stufen verwenden dieselbe
 Ergebnisanzeige, optionale Kampagnen-Banner und den Hinweis `KI-generiert`.
+
+## Bildanbieter
+
+Die Oberfläche bietet zwei klar getrennte Anbieter:
+
+- **Lokal · Qwen / ComfyUI:** Render-Prompt und synthetische Bilddaten bleiben
+  im lokalen Workflow. Ein fester Seed und ein separater Negative Prompt sind
+  verfügbar.
+- **Cloud · OpenAI Images API:** verwendet standardmäßig `gpt-image-2` für
+  Text-to-Image und für die Bearbeitung eines gespeicherten synthetischen
+  Ausgangsbildes. Die Cloud-API unterstützt in dieser Einbindung weder einen
+  festen Seed noch einen separaten Negative Prompt. Die verbindlichen
+  visuellen Leitplanken bleiben deshalb Teil des positiven Render-Prompts.
+
+Der Cloud-Anbieter überträgt den Render-Prompt und in der zweiten Prompt-Stufe
+das ausgewählte synthetische Ausgangsbild an die Images API. Die Auswahl wird
+in den technischen Daten des Ergebnisses dokumentiert. Ein API-Key wird
+ausschließlich serverseitig aus `OPENAI_API_KEY` gelesen und niemals an den
+Browser, in das Prompt-Paket, in die lokale Bibliothek oder in die
+Serverantwort ausgegeben.
+
+Cloud-Aufrufe können Kosten im zugehörigen API-Projekt verursachen. Für GPT
+Image kann außerdem eine Organisationsverifizierung erforderlich sein. Vor dem
+ersten Einsatz sollten daher Abrechnung, Projektlimits und API-Zugriff im
+eigenen OpenAI-Projekt geprüft werden.
 
 ## Prompt Engineering Lab
 
@@ -97,7 +124,7 @@ Kampagnenbibliothek ab. Gespeichert werden:
 - eine saubere interne Bearbeitungsquelle ohne eingebrannten Banner oder
   `KI-generiert`-Overlay,
 - positiver Prompt und Negative Prompt,
-- Modus, Seed, Modellbezeichnung und Bildabmessungen,
+- Modus, Anbieter, Seed-Verfügbarkeit, Modellbezeichnung und Bildabmessungen,
 - bei verketteten Ergebnissen die Referenz auf das Ausgangsmotiv.
 
 Ein gespeichertes synthetisches Text-to-Image-Ergebnis kann über
@@ -148,8 +175,7 @@ Der Text-to-Image-Workflow orientiert sich am nativen Qwen-Image-2512-Workflow v
 
 ## Installation unter Windows
 
-1. ComfyUI installieren beziehungsweise aktualisieren und die benötigten Modelle in die oben genannten Ordner legen.
-2. Im Projektordner eine virtuelle Umgebung erstellen:
+1. Im Projektordner eine virtuelle Umgebung erstellen:
 
    ```powershell
    py -3.10 -m venv webapp_env
@@ -157,7 +183,30 @@ Der Text-to-Image-Workflow orientiert sich am nativen Qwen-Image-2512-Workflow v
    python -m pip install -r requirements.txt
    ```
 
-3. Falls ComfyUI nicht unter `C:\AI\image\ComfyUI` liegt, die Konstante `COMFY_DIR` am Anfang von `main.py` anpassen.
+2. Für die lokale Generierung ComfyUI installieren beziehungsweise
+   aktualisieren und die benötigten Modelle in die oben genannten Ordner
+   legen. Falls ComfyUI nicht unter `C:\AI\image\ComfyUI` liegt, die Konstante
+   `COMFY_DIR` am Anfang von `main.py` anpassen.
+3. Optional den Cloud-Anbieter konfigurieren. Die Beispieldatei wird als
+   lokale `.env` kopiert; diese Datei wird von Git ignoriert:
+
+   ```powershell
+   Copy-Item .env.example .env
+   notepad .env
+   ```
+
+   In `.env` ausschließlich lokal den eigenen Schlüssel eintragen:
+
+   ```dotenv
+   OPENAI_API_KEY=hier_den_eigenen_api_key_eintragen
+   OPENAI_IMAGE_MODEL=gpt-image-2
+   OPENAI_IMAGE_QUALITY=medium
+   ```
+
+   Den Schlüssel niemals in die Browseroberfläche, ein Prompt-Feld, einen
+   Screenshot, einen Commit oder eine Supportnachricht kopieren. Alternativ
+   kann `OPENAI_API_KEY` entsprechend der offiziellen API-Dokumentation als
+   System-Umgebungsvariable gesetzt werden.
 4. Die Anwendung starten:
 
    ```powershell
@@ -165,6 +214,17 @@ Der Text-to-Image-Workflow orientiert sich am nativen Qwen-Image-2512-Workflow v
    ```
 
 Die Web-App wird anschließend lokal unter `http://127.0.0.1:8765` geöffnet. Ist dieser projektspezifische Standardport bereits belegt, wählt der Launcher automatisch den nächsten freien Port und zeigt die tatsächlich verwendete Adresse an. Eine bereits unter `http://127.0.0.1:8188` laufende ComfyUI-Instanz wird wiederverwendet, statt einen zweiten Prozess zu starten.
+
+Für einen reinen Cloud-Betrieb kann in `.env` zusätzlich gesetzt werden:
+
+```dotenv
+EMPLOYER_BRANDING_IMAGE_PROVIDER=openai
+EMPLOYER_BRANDING_SKIP_COMFYUI=1
+```
+
+Der Launcher prüft in diesem Fall keinen ComfyUI-Pfad und startet nur die
+Web-App. Ohne konfigurierten `OPENAI_API_KEY` bricht der Cloud-only-Start mit
+einer klaren Fehlermeldung ab.
 
 ## Modellwechsel
 
@@ -189,6 +249,12 @@ Reale Unternehmenslogos werden nicht durch das Modell generiert und sind nicht B
 Temporäre Ergebnisse und die bewusst gespeicherte Kampagnenbibliothek liegen
 lokal unter `webapp/data/`. Dieser Bereich wird von Git ignoriert und nicht in
 das öffentliche Repository übernommen.
+
+Die lokale `.env` enthält gegebenenfalls den Cloud-Schlüssel und wird ebenfalls
+von Git ignoriert. Nur die leere `.env.example` gehört in das Repository. Die
+Weboberfläche erhält ausschließlich den Status „konfiguriert“ oder „nicht
+konfiguriert“, niemals den Schlüsselwert. Bei Auswahl des Cloud-Anbieters weist
+die Oberfläche ausdrücklich auf die Datenübertragung hin.
 
 ## Entwicklungszweige
 

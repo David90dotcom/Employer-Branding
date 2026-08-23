@@ -127,6 +127,71 @@ h3 {
   font-size: 12px;
 }
 
+.provider-card h3 {
+  margin: 0;
+}
+
+.provider-option {
+  text-align: left;
+}
+
+.provider-option .provider-option-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.provider-option .provider-option-content small {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-option:disabled {
+  color: #687586;
+  background: #f2f4f7;
+}
+
+.provider-notice {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  background: var(--panel-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.provider-local {
+  color: #32634f;
+  background: #f2fbf6;
+  border-color: #bcdccc;
+}
+
+.provider-cloud {
+  color: #3f5270;
+  background: #f4f7ff;
+  border-color: #c9d9f2;
+}
+
+.provider-warning {
+  color: #7b5b22;
+  background: #fff8e8;
+  border-color: #ead39c;
+}
+
 .notice-card {
   display: flex;
   flex-direction: column;
