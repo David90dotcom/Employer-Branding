@@ -184,6 +184,7 @@
 
             <select id="bannerPosition">
               <option value="auto">Automatisch</option>
+              <option value="left">Links</option>
               <option value="bottom">Unten</option>
               <option value="top">Oben</option>
               <option value="right">Rechts</option>
@@ -241,6 +242,98 @@
             >
           </div>
 
+        </div>
+      </div>
+
+      <div class="postprocessing-divider"></div>
+
+      <div class="field">
+        <label>
+          <input id="logoEnabled" type="checkbox">
+          Berechtigt verwendetes Firmenlogo als PNG aufsetzen
+        </label>
+        <span class="field-help">
+          Das Logo wird nicht von der Bild-KI erzeugt. Es wird ausschließlich
+          nach der Generierung als exakte PNG-Datei auf das Anzeigebild gelegt.
+        </span>
+      </div>
+
+      <div id="logoSettings" class="logo-settings" hidden>
+        <div class="logo-settings-grid">
+          <div class="logo-control-stack">
+            <div class="field">
+              <label for="logoFile">Logo-PNG</label>
+              <input
+                id="logoFile"
+                name="logo_file"
+                type="file"
+                accept="image/png,.png"
+              >
+              <span class="field-help">
+                Ausschließlich PNG, maximal 5 MB. Transparenter Hintergrund
+                wird empfohlen. Die Datei wird nicht im Repository gespeichert.
+              </span>
+            </div>
+
+            <div class="field">
+              <label for="logoPreset">Schnellposition</label>
+              <select id="logoPreset">
+                <option value="top_right" selected>Oben rechts</option>
+                <option value="top_left_below_label">Oben links · unter KI-Hinweis</option>
+                <option value="bottom_right">Unten rechts</option>
+                <option value="bottom_left">Unten links</option>
+                <option value="custom">Benutzerdefiniert</option>
+              </select>
+            </div>
+
+            <div class="logo-range-grid">
+              <div class="field">
+                <label for="logoX">
+                  Horizontale Position
+                  <output id="logoXValue" for="logoX">100 %</output>
+                </label>
+                <input id="logoX" type="range" min="0" max="100" value="100">
+              </div>
+
+              <div class="field">
+                <label for="logoY">
+                  Vertikale Position
+                  <output id="logoYValue" for="logoY">0 %</output>
+                </label>
+                <input id="logoY" type="range" min="0" max="100" value="0">
+              </div>
+
+              <div class="field">
+                <label for="logoSize">
+                  Logogröße
+                  <output id="logoSizeValue" for="logoSize">14 %</output>
+                </label>
+                <input id="logoSize" type="range" min="5" max="30" value="14">
+              </div>
+            </div>
+
+            <label class="logo-rights-confirmation">
+              <input id="logoRightsConfirmed" type="checkbox">
+              Ich bestätige, dass ich zur Verwendung der ausgewählten
+              Logo-Datei berechtigt bin.
+            </label>
+          </div>
+
+          <div>
+            <strong class="logo-preview-title">Platzierungsvorschau</strong>
+            <div id="logoPlacementPreview" class="logo-placement-preview">
+              <span class="ai-label-preview">AI GENERATED</span>
+              <span id="logoPreviewPlaceholder" class="logo-preview-placeholder">
+                PNG auswählen
+              </span>
+              <img id="logoPreview" alt="Vorschau des ausgewählten Logos" hidden>
+            </div>
+            <span class="field-help">
+              Oben links bleibt für die verpflichtende KI-Kennzeichnung
+              reserviert. Bei einer Überschneidung verschiebt die App das Logo
+              automatisch in den nächstgelegenen freien Bereich.
+            </span>
+          </div>
         </div>
       </div>
 
@@ -424,6 +517,20 @@
     const bannerAlign = document.getElementById("bannerAlign");
     const bannerColor = document.getElementById("bannerColor");
 
+    const logoEnabled = document.getElementById("logoEnabled");
+    const logoSettings = document.getElementById("logoSettings");
+    const logoFile = document.getElementById("logoFile");
+    const logoPreset = document.getElementById("logoPreset");
+    const logoX = document.getElementById("logoX");
+    const logoY = document.getElementById("logoY");
+    const logoSize = document.getElementById("logoSize");
+    const logoXValue = document.getElementById("logoXValue");
+    const logoYValue = document.getElementById("logoYValue");
+    const logoSizeValue = document.getElementById("logoSizeValue");
+    const logoRightsConfirmed = document.getElementById("logoRightsConfirmed");
+    const logoPreview = document.getElementById("logoPreview");
+    const logoPreviewPlaceholder = document.getElementById("logoPreviewPlaceholder");
+
     let progressTimer = null;
     let previewTimer = null;
     let lastServerPrompt = "";
@@ -434,6 +541,7 @@
     let availableProviders = [];
     let selectedLibrarySource = null;
     let libraryItems = [];
+    let logoPreviewUrl = null;
 
 
     // ------------------------------------------------------------
@@ -1173,6 +1281,7 @@
         ? "block"
         : "none";
 
+      syncCampaignLayout();
       schedulePromptPreview();
     }
 
@@ -1192,6 +1301,83 @@
 
 
     // ------------------------------------------------------------
+    // Optionales Firmenlogo als deterministisches PNG-Overlay
+    // ------------------------------------------------------------
+
+    function updateLogoPreviewPlacement() {
+      const x = Number.parseInt(logoX.value, 10) || 0;
+      const y = Number.parseInt(logoY.value, 10) || 0;
+      const size = Number.parseInt(logoSize.value, 10) || 14;
+
+      logoXValue.value = `${x} %`;
+      logoYValue.value = `${y} %`;
+      logoSizeValue.value = `${size} %`;
+
+      logoPreview.style.left = `${x}%`;
+      logoPreview.style.top = `${y}%`;
+      logoPreview.style.width = `${size}%`;
+      logoPreview.style.transform = `translate(-${x}%, -${y}%)`;
+    }
+
+
+    function applyLogoPreset(preset) {
+      const positions = {
+        top_right: [100, 0],
+        top_left_below_label: [0, 24],
+        bottom_right: [100, 100],
+        bottom_left: [0, 100]
+      };
+      const position = positions[preset];
+
+      if (position) {
+        logoX.value = String(position[0]);
+        logoY.value = String(position[1]);
+      }
+
+      updateLogoPreviewPlacement();
+    }
+
+
+    function updateLogoVisibility() {
+      logoSettings.hidden = !logoEnabled.checked;
+    }
+
+
+    function updateLogoFilePreview() {
+      if (logoPreviewUrl) {
+        URL.revokeObjectURL(logoPreviewUrl);
+        logoPreviewUrl = null;
+      }
+
+      const file = logoFile.files?.[0];
+
+      if (!file) {
+        logoPreview.hidden = true;
+        logoPreview.removeAttribute("src");
+        logoPreviewPlaceholder.hidden = false;
+        return;
+      }
+
+      logoPreviewUrl = URL.createObjectURL(file);
+      logoPreview.src = logoPreviewUrl;
+      logoPreview.hidden = false;
+      logoPreviewPlaceholder.hidden = true;
+      updateLogoPreviewPlacement();
+    }
+
+
+    function collectLogoSettings() {
+      return {
+        enabled: Boolean(logoEnabled.checked),
+        rights_confirmed: Boolean(logoRightsConfirmed.checked),
+        x_percent: Number.parseInt(logoX.value, 10),
+        y_percent: Number.parseInt(logoY.value, 10),
+        size_percent: Number.parseInt(logoSize.value, 10)
+      };
+    }
+
+
+    // ------------------------------------------------------------
     // Prompt-Komponenten
     // ------------------------------------------------------------
 
@@ -1206,6 +1392,7 @@
 
       components.extraPrompt = extraPrompt.value.trim();
       components.banner = collectBannerSettings();
+      components.logo = collectLogoSettings();
       const provider = getCurrentProvider();
       components.generation = {
         provider: currentProvider,
@@ -1216,6 +1403,35 @@
       };
 
       return components;
+    }
+
+
+    function syncCampaignLayout() {
+      const campaignSpace = document.getElementById("campaignSpace");
+      const spaceTreatment = document.getElementById("spaceTreatment");
+      const selectedOption = campaignSpace?.selectedOptions?.[0];
+      const position = String(
+        selectedOption?.dataset?.campaignSpacePosition || ""
+      );
+
+      if (spaceTreatment) {
+        spaceTreatment.disabled = !position;
+        spaceTreatment.closest(".field")?.classList.toggle(
+          "field-disabled",
+          !position
+        );
+      }
+
+      if (currentMode === "prompt_chain" && bannerEnabled.checked && position) {
+        bannerPosition.value = position;
+        bannerPosition.disabled = true;
+        bannerPosition.title = (
+          "Die Bannerposition folgt automatisch der reservierten Kampagnenfläche."
+        );
+      } else {
+        bannerPosition.disabled = false;
+        bannerPosition.removeAttribute("title");
+      }
     }
 
 
@@ -1655,11 +1871,18 @@
               );
             }
 
+            if (optionData.campaign_space_position !== undefined) {
+              option.dataset.campaignSpacePosition = String(
+                optionData.campaign_space_position || ""
+              );
+            }
+
             select.appendChild(option);
           }
 
           select.addEventListener("change", () => {
             updateTextToImageCompatibility();
+            syncCampaignLayout();
             schedulePromptPreview();
           });
 
@@ -1684,6 +1907,7 @@
         }
 
         updateTextToImageCompatibility();
+        syncCampaignLayout();
 
         console.log(
           "Geladene UI-Felder:",
@@ -1787,6 +2011,31 @@
       schedulePromptPreview
     );
 
+    logoEnabled.addEventListener("change", () => {
+      updateLogoVisibility();
+      schedulePromptPreview();
+    });
+
+    logoFile.addEventListener("change", updateLogoFilePreview);
+
+    logoPreset.addEventListener("change", () => {
+      applyLogoPreset(logoPreset.value);
+      schedulePromptPreview();
+    });
+
+    for (const control of [logoX, logoY, logoSize]) {
+      control.addEventListener("input", () => {
+        logoPreset.value = "custom";
+        updateLogoPreviewPlacement();
+        schedulePromptPreview();
+      });
+    }
+
+    logoRightsConfirmed.addEventListener(
+      "change",
+      schedulePromptPreview
+    );
+
     function updateSeedState() {
       fixedSeed.disabled = (
         !getCurrentProvider()?.supports_seed ||
@@ -1887,6 +2136,35 @@
         return;
       }
 
+      const selectedLogoFile = logoFile.files?.[0] || null;
+
+      if (logoEnabled.checked) {
+        if (!selectedLogoFile) {
+          alert("Bitte zuerst eine Logo-PNG auswählen.");
+          return;
+        }
+
+        if (
+          !selectedLogoFile.name.toLowerCase().endsWith(".png") ||
+          (selectedLogoFile.type && selectedLogoFile.type !== "image/png")
+        ) {
+          alert("Als Firmenlogo ist ausschließlich eine PNG-Datei erlaubt.");
+          return;
+        }
+
+        if (selectedLogoFile.size > 5 * 1024 * 1024) {
+          alert("Die Logo-PNG darf höchstens 5 MB groß sein.");
+          return;
+        }
+
+        if (!logoRightsConfirmed.checked) {
+          alert(
+            "Bitte bestätige, dass du zur Verwendung der Logo-Datei berechtigt bist."
+          );
+          return;
+        }
+      }
+
       const preview = await requestPromptPreview();
 
       if (!preview.ok) {
@@ -1941,6 +2219,14 @@
         "prompt_components",
         JSON.stringify(components)
       );
+
+      if (logoEnabled.checked && selectedLogoFile) {
+        formData.append(
+          "logo_file",
+          selectedLogoFile,
+          selectedLogoFile.name
+        );
+      }
 
       pollProgress();
 
@@ -2036,6 +2322,8 @@
     // ------------------------------------------------------------
 
     updateBannerVisibility();
+    updateLogoVisibility();
+    applyLogoPreset(logoPreset.value);
     fixedSeed.disabled = (
       !getCurrentProvider()?.supports_seed ||
       !fixedSeedEnabled.checked

@@ -270,13 +270,14 @@
     ]
   },
   {
-    "id": "composition",
-    "label": "Bildausschnitt / Kampagnenkomposition",
-    "help": "Stufe 2 behält das Seitenverhältnis des Ausgangsbildes bei, kann aber Bildhierarchie und Textfläche verbessern.",
+    "id": "framing",
+    "label": "Bildausschnitt",
+    "help": "Der Bildausschnitt wird unabhängig von der später nutzbaren Textfläche festgelegt.",
     "options": [
       {
         "label": "Unverändert lassen",
-        "value": ""
+        "value": "",
+        "default": true
       },
       {
         "label": "Halbkörper mit sichtbarer Tätigkeit",
@@ -291,16 +292,64 @@
         "value": "Use a wide documentary composition in which people, workplace, and the concrete task remain immediately understandable."
       },
       {
-        "label": "Person links, Textfläche rechts",
-        "value": "Place the main visual activity in the left portion of the existing frame and create calm, clean negative space on the right for separately added campaign copy."
-      },
-      {
-        "label": "Person rechts, Textfläche links",
-        "value": "Place the main visual activity in the right portion of the existing frame and create calm, clean negative space on the left for separately added campaign copy."
-      },
-      {
         "label": "Zentrierte Social-Media-Komposition",
         "value": "Use a balanced centered composition with a strong focal point, clear silhouette, and uncluttered background for social-media use within the existing aspect ratio."
+      }
+    ]
+  },
+  {
+    "id": "campaignSpace",
+    "label": "Nutzbare Fläche für Kampagnentext",
+    "help": "Reserviert eine klar abgegrenzte, ruhige Fläche. Die Hauptaktivität wird automatisch auf der gegenüberliegenden Bildseite angeordnet.",
+    "options": [
+      {
+        "label": "Keine zusätzliche Textfläche",
+        "value": "",
+        "campaign_space_position": ""
+      },
+      {
+        "label": "Rechts · etwa 35–40 %",
+        "value": "Reserve approximately 35 to 40 percent of the image width on the right as calm, usable negative space for separately added campaign copy. Place the people, hands, workplace activity, and essential work objects clearly in the left portion of the frame.",
+        "campaign_space_position": "right"
+      },
+      {
+        "label": "Links · etwa 35–40 %",
+        "value": "Reserve approximately 35 to 40 percent of the image width on the left as calm, usable negative space for separately added campaign copy. Place the people, hands, workplace activity, and essential work objects clearly in the right portion of the frame.",
+        "campaign_space_position": "left"
+      },
+      {
+        "label": "Oben · etwa 25–30 %",
+        "value": "Reserve approximately 25 to 30 percent of the image height at the top as calm, usable negative space for separately added campaign copy. Keep faces, hands, workplace activity, and essential work objects clearly below this area.",
+        "campaign_space_position": "top"
+      },
+      {
+        "label": "Unten · etwa 25–30 %",
+        "value": "Reserve approximately 25 to 30 percent of the image height at the bottom as calm, usable negative space for separately added campaign copy. Keep faces, hands, workplace activity, and essential work objects clearly above this area.",
+        "campaign_space_position": "bottom"
+      }
+    ]
+  },
+  {
+    "id": "spaceTreatment",
+    "label": "Gestaltung der reservierten Fläche",
+    "help": "Wird nur angewendet, wenn eine Kampagnentextfläche ausgewählt ist.",
+    "options": [
+      {
+        "label": "Ruhig und szenenkonsistent (empfohlen)",
+        "value": "Continue the existing workplace environment naturally into the reserved area while keeping it calm, uncluttered, low-detail, and visually subordinate.",
+        "default": true
+      },
+      {
+        "label": "Leicht unscharf und detailarm",
+        "value": "Use a subtle, natural depth-of-field transition in the reserved area so it remains softly blurred, low-detail, and suitable for high-contrast campaign copy."
+      },
+      {
+        "label": "Hell und kontrastarm",
+        "value": "Keep the reserved area naturally bright, low-contrast, and visually quiet without turning it into an artificial blank panel."
+      },
+      {
+        "label": "Dunkel und kontrastarm",
+        "value": "Keep the reserved area naturally dark, low-contrast, and visually quiet without turning it into an artificial blank panel."
       }
     ]
   },

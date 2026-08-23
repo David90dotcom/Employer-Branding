@@ -1,4 +1,12 @@
-from fastapi import FastAPI, HTTPException, Form, Body, Query
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Form,
+    Body,
+    Query,
+    File,
+    UploadFile
+)
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -19,7 +27,7 @@ from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlencode
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, UnidentifiedImageError
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -65,6 +73,12 @@ ASSETS_DIR = BASE_DIR / "static" / "assets"
 ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 
 AI_OVERLAY_PATH = ASSETS_DIR / "ai_generated_overlay.png"
+AI_OVERLAY_POSITION = "top_left"
+
+MAX_LOGO_UPLOAD_BYTES = 5 * 1024 * 1024
+MAX_LOGO_PIXELS = 16_000_000
+MIN_LOGO_SIZE_PERCENT = 5
+MAX_LOGO_SIZE_PERCENT = 30
 
 app = FastAPI()
 
@@ -793,6 +807,7 @@ def normalize_banner_settings(raw_components):
 
     allowed_positions = {
         "auto",
+        "left",
         "bottom",
         "top",
         "right"
@@ -855,6 +870,45 @@ def normalize_banner_settings(raw_components):
         "font": font,
         "align": align,
         "color": color
+    }
+
+
+def normalize_logo_settings(raw_components):
+    """Validate positioning data without receiving or storing the PNG."""
+    raw_logo = raw_components.get("logo", {})
+
+    if not isinstance(raw_logo, dict):
+        raw_logo = {}
+
+    enabled_value = raw_logo.get("enabled", False)
+    enabled = enabled_value is True or str(
+        enabled_value
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+    rights_value = raw_logo.get("rights_confirmed", False)
+    rights_confirmed = rights_value is True or str(
+        rights_value
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+    def bounded_integer(name, default, minimum, maximum):
+        try:
+            value = int(float(raw_logo.get(name, default)))
+        except (TypeError, ValueError):
+            value = default
+
+        return max(minimum, min(maximum, value))
+
+    return {
+        "enabled": enabled,
+        "rights_confirmed": rights_confirmed,
+        "x_percent": bounded_integer("x_percent", 100, 0, 100),
+        "y_percent": bounded_integer("y_percent", 0, 0, 100),
+        "size_percent": bounded_integer(
+            "size_percent",
+            14,
+            MIN_LOGO_SIZE_PERCENT,
+            MAX_LOGO_SIZE_PERCENT
+        )
     }
 
 
@@ -928,6 +982,7 @@ def normalize_prompt_components(raw_components, mode=DEFAULT_MODE):
 
     normalized["extraPrompt"] = extra_prompt
     normalized["banner"] = normalize_banner_settings(raw_components)
+    normalized["logo"] = normalize_logo_settings(raw_components)
     normalized["generation"] = normalize_generation_settings(raw_components)
 
     if invalid_fields:
@@ -981,8 +1036,38 @@ def selected_option_label(selected_options, field_id):
     return str(option.get("label", "") or "").strip()
 
 
+def selected_campaign_space_position(components):
+    selected_options = get_selected_ui_options(
+        components,
+        "prompt_chain"
+    )
+    option = selected_options.get("campaignSpace", {})
+    return str(
+        option.get("campaign_space_position", "") or ""
+    ).strip()
+
+
 def validate_prompt_component_compatibility(components, mode):
     """Reject combinations that would create contradictory person prompts."""
+    if mode == "prompt_chain":
+        campaign_space_position = selected_campaign_space_position(
+            components
+        )
+
+        if not campaign_space_position:
+            components["spaceTreatment"] = ""
+            return
+
+        banner = components.get("banner", {})
+
+        if banner.get("enabled"):
+            # A selected usable area is authoritative. This prevents the
+            # generated composition and the deterministic banner placement
+            # from requesting opposite sides of the same image.
+            banner["position"] = campaign_space_position
+
+        return
+
     if mode != "text_to_image":
         return
 
@@ -1153,6 +1238,7 @@ def build_success_criteria(components, selected_options=None):
         components,
         "text_to_image"
     )
+    logo_enabled = components.get("logo", {}).get("enabled", False)
     criteria = [
         {
             "prompt": (
@@ -1198,10 +1284,19 @@ def build_success_criteria(components, selected_options=None):
         },
         {
             "prompt": (
+                "No identifiable real person, model-generated logo, readable "
+                "brand name, tokenism, or stereotypical depiction may appear. "
+                "An authorized logo may only be added as an exact deterministic "
+                "PNG overlay after generation."
+                if logo_enabled else
                 "No identifiable real person, logo, readable brand name, "
                 "tokenism, or stereotypical depiction may appear."
             ),
             "label": (
+                "Keine identifizierbare reale Person und kein vom Modell "
+                "erzeugtes Logo; ein berechtigt verwendetes Logo wird nur "
+                "anschließend als exaktes PNG-Overlay ergänzt."
+                if logo_enabled else
                 "Keine identifizierbare reale Person, kein Logo, kein lesbarer "
                 "Markenname, kein Tokenismus und keine stereotype Darstellung."
             )
@@ -1465,6 +1560,28 @@ def build_text_to_image_sections(components):
 
 
 def build_prompt_chain_success_criteria(components):
+    logo_enabled = components.get("logo", {}).get("enabled", False)
+    logo_criterion = {
+        "prompt": (
+            "No model-generated company logo, readable brand name, generated "
+            "campaign text, real-employee claim, tokenism, or stereotypical "
+            "depiction may appear. An authorized logo may only be added as "
+            "an exact deterministic PNG overlay after generation."
+            if logo_enabled else
+            "No company logo, readable brand name, generated campaign text, "
+            "real-employee claim, tokenism, or stereotypical depiction may "
+            "appear."
+        ),
+        "label": (
+            "Das Modell erzeugt keine Logos oder Markennamen; ein berechtigt "
+            "verwendetes Logo wird ausschließlich anschließend als exaktes "
+            "PNG-Overlay ergänzt."
+            if logo_enabled else
+            "Keine Logos, lesbaren Markennamen, generierten Kampagnentexte, "
+            "vorgetäuschten Beschäftigtenaussagen, Tokenismen oder "
+            "stereotypen Darstellungen."
+        )
+    }
     criteria = [
         {
             "prompt": (
@@ -1518,18 +1635,7 @@ def build_prompt_chain_success_criteria(components):
                 "körperlich plausibel und inhaltlich aufeinander bezogen."
             )
         },
-        {
-            "prompt": (
-                "No company logo, readable brand name, generated campaign text, "
-                "real-employee claim, tokenism, or stereotypical depiction may "
-                "appear."
-            ),
-            "label": (
-                "Keine Logos, lesbaren Markennamen, generierten Kampagnentexte, "
-                "vorgetäuschten Beschäftigtenaussagen, Tokenismen oder "
-                "stereotypen Darstellungen."
-            )
-        },
+        logo_criterion,
         {
             "prompt": (
                 "The result must support the intended campaign use and remain "
@@ -1562,6 +1668,33 @@ def build_prompt_chain_success_criteria(components):
                     "Jede zusätzliche fiktive Person erfüllt eine erkennbare "
                     "Funktion in derselben Arbeitssituation, ist eindeutig "
                     "volljährig und dient nicht nur als Dekoration."
+                )
+            }
+        )
+
+    campaign_space_position = selected_campaign_space_position(components)
+
+    if campaign_space_position:
+        position_label = {
+            "left": "links",
+            "right": "rechts",
+            "top": "oben",
+            "bottom": "unten"
+        }.get(campaign_space_position, campaign_space_position)
+        criteria.insert(
+            2,
+            {
+                "prompt": (
+                    "The selected campaign-copy area must have the requested "
+                    "size and position, remain calm and low-detail, and stay "
+                    "free of faces, hands, essential work objects, and "
+                    "generated typography."
+                ),
+                "label": (
+                    "Die reservierte Kampagnenfläche liegt "
+                    f"{position_label}, besitzt die gewählte Größe "
+                    "und bleibt ruhig, detailarm sowie frei von Gesichtern, "
+                    "Händen, zentralen Arbeitsobjekten und generierter Schrift."
                 )
             }
         )
@@ -1619,7 +1752,9 @@ def build_prompt_chain_sections(components):
         ("Gaze", components.get("gaze", "")),
         ("Facial expression", components.get("expression", "")),
         ("Clothing and role styling", components.get("roleStyling", "")),
-        ("Composition", components.get("composition", "")),
+        ("Framing", components.get("framing", "")),
+        ("Usable campaign-copy area", components.get("campaignSpace", "")),
+        ("Reserved-area treatment", components.get("spaceTreatment", "")),
         ("Visual effect", components.get("visualEffect", "")),
         ("Quality correction", components.get("correctionFocus", ""))
     ]
@@ -1668,7 +1803,9 @@ def build_prompt_chain_sections(components):
         )
     ]
 
-    if banner.get("enabled"):
+    campaign_space_position = selected_campaign_space_position(components)
+
+    if banner.get("enabled") and not campaign_space_position:
         banner_position = banner.get("position", "auto")
 
         if banner_position == "auto":
@@ -1679,6 +1816,12 @@ def build_prompt_chain_sections(components):
             banner_position +
             " for a separately rendered campaign banner. Do not generate the "
             "banner text inside the image."
+        )
+    elif banner.get("enabled"):
+        output_parts.append(
+            "Keep the selected reserved campaign area free of generated "
+            "typography so that the campaign banner can be rendered there "
+            "deterministically after image generation."
         )
 
     output_text = " ".join(output_parts)
@@ -2045,10 +2188,14 @@ def render_banner_on_image(image_bytes, banner):
     margin = int(min(width, height) * 0.045)
     radius = int(min(width, height) * 0.035)
 
-    if position == "right":
+    if position in {"left", "right"}:
         box_width = int(width * 0.38)
         box_height = height - 2 * margin
-        box_x = width - box_width - margin
+        box_x = (
+            margin
+            if position == "left"
+            else width - box_width - margin
+        )
         box_y = margin
         inner_pad = int(box_width * 0.10)
         text_max_width = box_width - 2 * inner_pad
@@ -2233,16 +2380,242 @@ def render_banner_on_image(image_bytes, banner):
 
 
 # ---------------------------------------------------------------------------
-# AI-Overlay / Kennzeichnung
+# Deterministische PNG-Overlays
 # ---------------------------------------------------------------------------
 
-def render_ai_overlay_on_image(image_bytes):
-    """
-    Legt das transparente PNG static/assets/ai_generated_overlay.png
-    proportional skaliert und zentriert über das Ergebnisbild.
+def sanitize_logo_png_bytes(file_bytes):
+    """Accept one bounded PNG and remove metadata by re-encoding it."""
+    if not file_bytes:
+        raise HTTPException(
+            status_code=400,
+            detail="Die ausgewählte Logo-PNG ist leer."
+        )
 
-    Wenn die Datei fehlt, wird das Bild unverändert zurückgegeben.
-    """
+    if len(file_bytes) > MAX_LOGO_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail="Die Logo-PNG darf höchstens 5 MB groß sein."
+        )
+
+    try:
+        with Image.open(BytesIO(file_bytes)) as image:
+            if image.format != "PNG":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Als Firmenlogo ist ausschließlich PNG erlaubt."
+                )
+
+            if getattr(image, "n_frames", 1) != 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Animierte PNG-Dateien sind nicht erlaubt."
+                )
+
+            width, height = image.size
+
+            if width < 1 or height < 1 or width * height > MAX_LOGO_PIXELS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Die Logo-PNG besitzt unzulässige Abmessungen "
+                        "oder mehr als 16 Megapixel."
+                    )
+                )
+
+            sanitized = image.convert("RGBA")
+            sanitized.load()
+    except HTTPException:
+        raise
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Die hochgeladene Datei ist keine lesbare PNG-Datei."
+        ) from exc
+
+    output = BytesIO()
+    sanitized.save(output, format="PNG", optimize=True)
+    return output.getvalue()
+
+
+async def read_logo_upload(logo_file, logo_settings):
+    """Read an optional upload only for the current generation request."""
+    if not logo_settings.get("enabled"):
+        return None
+
+    if not logo_settings.get("rights_confirmed"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Bitte bestätige vor der Verwendung, dass du zur Nutzung "
+                "der Logo-Datei berechtigt bist."
+            )
+        )
+
+    if logo_file is None or not hasattr(logo_file, "read"):
+        raise HTTPException(
+            status_code=400,
+            detail="Logo-Overlay ist aktiviert, aber keine PNG wurde gewählt."
+        )
+
+    try:
+        file_bytes = await logo_file.read(MAX_LOGO_UPLOAD_BYTES + 1)
+    finally:
+        close = getattr(logo_file, "close", None)
+
+        if close is not None:
+            result = close()
+
+            if asyncio.iscoroutine(result):
+                await result
+
+    return sanitize_logo_png_bytes(file_bytes)
+
+
+def rectangles_overlap(first, second, padding=0):
+    return not (
+        first[2] + padding <= second[0] or
+        second[2] + padding <= first[0] or
+        first[3] + padding <= second[1] or
+        second[3] + padding <= first[1]
+    )
+
+
+def calculate_ai_overlay_layout(base_size, overlay_size):
+    base_w, base_h = base_size
+    overlay_w, overlay_h = overlay_size
+    scale = min(
+        base_w / overlay_w,
+        base_h / overlay_h
+    ) * 0.24
+    new_size = (
+        max(1, int(overlay_w * scale)),
+        max(1, int(overlay_h * scale))
+    )
+    margin_x = int(base_w * 0.035)
+    margin_y = int(base_h * 0.035)
+
+    if AI_OVERLAY_POSITION == "top_left":
+        position = (margin_x, margin_y)
+    else:
+        position = (
+            base_w - new_size[0] - margin_x,
+            margin_y
+        )
+
+    return new_size, position
+
+
+def ai_overlay_reserved_box(base_size):
+    if not AI_OVERLAY_PATH.exists():
+        return None
+
+    with Image.open(AI_OVERLAY_PATH) as overlay:
+        new_size, position = calculate_ai_overlay_layout(
+            base_size,
+            overlay.size
+        )
+
+    return (
+        position[0],
+        position[1],
+        position[0] + new_size[0],
+        position[1] + new_size[1]
+    )
+
+
+def calculate_logo_layout(base_size, logo_size, settings, reserved_box=None):
+    base_w, base_h = base_size
+    logo_w, logo_h = logo_size
+    requested_width = base_w * settings["size_percent"] / 100
+    maximum_height = base_h * 0.32
+    scale = min(
+        requested_width / logo_w,
+        maximum_height / logo_h
+    )
+    new_size = (
+        max(1, int(logo_w * scale)),
+        max(1, int(logo_h * scale))
+    )
+    margin = max(1, int(min(base_w, base_h) * 0.03))
+    available_x = max(0, base_w - 2 * margin - new_size[0])
+    available_y = max(0, base_h - 2 * margin - new_size[1])
+    requested = (
+        margin + round(available_x * settings["x_percent"] / 100),
+        margin + round(available_y * settings["y_percent"] / 100)
+    )
+
+    def box_at(position):
+        return (
+            position[0],
+            position[1],
+            position[0] + new_size[0],
+            position[1] + new_size[1]
+        )
+
+    if not reserved_box or not rectangles_overlap(
+        box_at(requested),
+        reserved_box,
+        padding=margin
+    ):
+        return new_size, requested
+
+    candidates = [
+        (requested[0], reserved_box[3] + margin),
+        (reserved_box[2] + margin, requested[1]),
+        (margin + available_x, margin),
+        (margin, margin + available_y),
+        (margin + available_x, margin + available_y)
+    ]
+    valid_candidates = []
+
+    for candidate in candidates:
+        x = max(margin, min(margin + available_x, candidate[0]))
+        y = max(margin, min(margin + available_y, candidate[1]))
+        normalized_candidate = (x, y)
+
+        if not rectangles_overlap(
+            box_at(normalized_candidate),
+            reserved_box,
+            padding=margin
+        ):
+            valid_candidates.append(normalized_candidate)
+
+    if not valid_candidates:
+        return new_size, requested
+
+    closest = min(
+        valid_candidates,
+        key=lambda candidate: (
+            (candidate[0] - requested[0]) ** 2 +
+            (candidate[1] - requested[1]) ** 2
+        )
+    )
+    return new_size, closest
+
+
+def render_logo_overlay_on_image(image_bytes, logo_bytes, settings):
+    if not logo_bytes or not settings.get("enabled"):
+        return image_bytes
+
+    base = Image.open(BytesIO(image_bytes)).convert("RGBA")
+    logo = Image.open(BytesIO(logo_bytes)).convert("RGBA")
+    new_size, position = calculate_logo_layout(
+        base.size,
+        logo.size,
+        settings,
+        reserved_box=ai_overlay_reserved_box(base.size)
+    )
+    logo = logo.resize(new_size, Image.LANCZOS)
+    layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    layer.paste(logo, position, logo)
+    result = Image.alpha_composite(base, layer)
+    output = BytesIO()
+    result.save(output, format="PNG", optimize=True)
+    return output.getvalue()
+
+
+def render_ai_overlay_on_image(image_bytes):
+    """Place the mandatory transparent AI label in the upper-left corner."""
     if not AI_OVERLAY_PATH.exists():
         print(
             f"WARNUNG: AI-Overlay nicht gefunden: {AI_OVERLAY_PATH}"
@@ -2251,58 +2624,20 @@ def render_ai_overlay_on_image(image_bytes):
 
     base = Image.open(BytesIO(image_bytes)).convert("RGBA")
     overlay = Image.open(AI_OVERLAY_PATH).convert("RGBA")
-
-    base_w, base_h = base.size
-    overlay_w, overlay_h = overlay.size
-
-    scale = min(
-        base_w / overlay_w,
-        base_h / overlay_h
-    ) * 0.24
-
-    new_size = (
-        max(1, int(overlay_w * scale)),
-        max(1, int(overlay_h * scale))
-    )
-
-    overlay = overlay.resize(
-        new_size,
-        Image.LANCZOS
-    )
-
-    margin_x = int(base_w * 0.035)
-    margin_y = int(base_h * 0.035)
-
-    x = base_w - overlay.width - margin_x
-    y = margin_y
-
-    layer = Image.new(
-        "RGBA",
+    new_size, position = calculate_ai_overlay_layout(
         base.size,
-        (0, 0, 0, 0)
+        overlay.size
     )
-
-    layer.paste(
-        overlay,
-        (x, y),
-        overlay
-    )
-
-    result = Image.alpha_composite(
-        base,
-        layer
-    )
-
+    overlay = overlay.resize(new_size, Image.LANCZOS)
+    layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
+    layer.paste(overlay, position, overlay)
+    result = Image.alpha_composite(base, layer)
     output = BytesIO()
-
     result.convert("RGB").save(
         output,
         format="PNG",
         optimize=True
     )
-
-    output.seek(0)
-
     return output.getvalue()
 
 
@@ -2968,7 +3303,8 @@ async def run(
     prompt_components: str = Form(...),
     mode: str = Form(DEFAULT_MODE),
     library_source_id: str = Form(""),
-    image_provider: str = Form(DEFAULT_IMAGE_PROVIDER)
+    image_provider: str = Form(DEFAULT_IMAGE_PROVIDER),
+    logo_file: UploadFile = File(None)
 ):
     normalized_mode = normalize_mode(mode)
     normalized_provider = normalize_image_provider(
@@ -2993,6 +3329,11 @@ async def run(
         normalized_provider,
         normalized_mode
     )
+    logo_bytes = await read_logo_upload(
+        logo_file,
+        components.get("logo", {})
+    )
+    components.setdefault("logo", {})["applied"] = bool(logo_bytes)
 
     library_source_row = None
 
@@ -3138,6 +3479,7 @@ async def run(
     view_urls = []
 
     banner = components.get("banner", {})
+    logo_settings = components.get("logo", {})
     submitted_negative_prompt = (
         negative_prompt
         if IMAGE_PROVIDERS[normalized_provider]["supports_negative_prompt"]
@@ -3155,6 +3497,13 @@ async def run(
             display_image_bytes = render_banner_on_image(
                 display_image_bytes,
                 banner
+            )
+
+        if logo_bytes:
+            display_image_bytes = render_logo_overlay_on_image(
+                display_image_bytes,
+                logo_bytes,
+                logo_settings
             )
 
         display_image_bytes = render_ai_overlay_on_image(

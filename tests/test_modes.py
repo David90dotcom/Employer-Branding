@@ -9,7 +9,7 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from PIL import Image
 
 from webapp import app as module
@@ -635,18 +635,28 @@ class GenerationModeTests(unittest.TestCase):
                 "gaze",
                 "expression",
                 "roleStyling",
-                "composition",
+                "framing",
+                "campaignSpace",
+                "spaceTreatment",
                 "visualEffect",
                 "correctionFocus"
             }
         )
 
-    def test_prompt_chain_banner_requests_negative_space(self):
+    def test_prompt_chain_separates_framing_and_campaign_space(self):
         fields = module.load_ui_fields("prompt_chain")
-        raw = {
-            field["id"]: field["options"][1]["value"]
-            for field in fields
-        }
+        by_id = {field["id"]: field for field in fields}
+        raw = default_components_for_mode("prompt_chain")
+        raw["optimizationGoal"] = by_id["optimizationGoal"]["options"][6][
+            "value"
+        ]
+        raw["framing"] = by_id["framing"]["options"][1]["value"]
+        raw["campaignSpace"] = by_id["campaignSpace"]["options"][1][
+            "value"
+        ]
+        raw["spaceTreatment"] = by_id["spaceTreatment"]["options"][0][
+            "value"
+        ]
         raw["banner"] = {
             "enabled": True,
             "text": "Deine Zukunft beginnt hier",
@@ -664,8 +674,46 @@ class GenerationModeTests(unittest.TestCase):
         components = module.normalize_prompt_components(raw, "prompt_chain")
         prompt = module.build_prompt_from_components(components, "prompt_chain")
 
-        self.assertIn("negative space at the right", prompt)
-        self.assertIn("Do not generate the banner text", prompt)
+        self.assertIn("medium environmental shot", prompt)
+        self.assertIn("35 to 40 percent", prompt)
+        self.assertIn("right as calm, usable negative space", prompt)
+        self.assertIn("existing workplace environment naturally", prompt)
+        self.assertIn("selected reserved campaign area", prompt)
+        self.assertEqual(components["banner"]["position"], "right")
+
+    def test_prompt_chain_campaign_space_overrides_conflicting_banner_side(self):
+        fields = {
+            field["id"]: field
+            for field in module.load_ui_fields("prompt_chain")
+        }
+        raw = default_components_for_mode("prompt_chain")
+        raw["campaignSpace"] = fields["campaignSpace"]["options"][2][
+            "value"
+        ]
+        raw["banner"] = {
+            "enabled": True,
+            "text": "Duales Studium",
+            "position": "right"
+        }
+
+        components = module.normalize_prompt_components(raw, "prompt_chain")
+
+        self.assertEqual(components["banner"]["position"], "left")
+
+    def test_prompt_chain_ignores_area_treatment_without_reserved_space(self):
+        fields = {
+            field["id"]: field
+            for field in module.load_ui_fields("prompt_chain")
+        }
+        raw = default_components_for_mode("prompt_chain")
+        raw["campaignSpace"] = ""
+        raw["spaceTreatment"] = fields["spaceTreatment"]["options"][1][
+            "value"
+        ]
+
+        components = module.normalize_prompt_components(raw, "prompt_chain")
+
+        self.assertEqual(components["spaceTreatment"], "")
 
     def test_prompt_chain_requires_a_primary_optimization_goal(self):
         raw = default_components_for_mode("prompt_chain")
@@ -695,6 +743,171 @@ class GenerationModeTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.status_code, 400)
         self.assertIn("requires a saved library image", raised.exception.detail)
+
+    def test_logo_settings_are_bounded_and_never_enter_the_model_prompt(self):
+        raw = default_components_for_mode("text_to_image")
+        raw["logo"] = {
+            "enabled": True,
+            "rights_confirmed": True,
+            "x_percent": 170,
+            "y_percent": -25,
+            "size_percent": 80
+        }
+
+        components = module.normalize_prompt_components(raw, "text_to_image")
+        prompt = module.build_prompt_from_components(
+            components,
+            "text_to_image"
+        )
+
+        self.assertEqual(components["logo"]["x_percent"], 100)
+        self.assertEqual(components["logo"]["y_percent"], 0)
+        self.assertEqual(components["logo"]["size_percent"], 30)
+        self.assertNotIn("logo_file", prompt)
+        self.assertIn("No company logos", prompt)
+        self.assertTrue(
+            any(
+                "PNG-Overlay" in criterion["label"]
+                for criterion in module.build_success_criteria(components)
+            )
+        )
+
+    def test_logo_upload_requires_rights_confirmation(self):
+        with self.assertRaises(HTTPException) as raised:
+            asyncio.run(
+                module.read_logo_upload(
+                    None,
+                    {
+                        "enabled": True,
+                        "rights_confirmed": False
+                    }
+                )
+            )
+
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn("berechtigt", raised.exception.detail)
+
+    def test_logo_upload_accepts_only_sanitized_png(self):
+        png_bytes = self.make_test_image(240, 120)
+        sanitized = module.sanitize_logo_png_bytes(png_bytes)
+
+        with Image.open(BytesIO(sanitized)) as image:
+            self.assertEqual(image.format, "PNG")
+            self.assertEqual(image.mode, "RGBA")
+
+        jpeg = BytesIO()
+        Image.new("RGB", (120, 60), (220, 40, 40)).save(
+            jpeg,
+            format="JPEG"
+        )
+
+        with self.assertRaises(HTTPException) as raised:
+            module.sanitize_logo_png_bytes(jpeg.getvalue())
+
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn("PNG", raised.exception.detail)
+
+    def test_logo_layout_avoids_the_mandatory_ai_label(self):
+        new_size, position = module.calculate_logo_layout(
+            base_size=(1000, 500),
+            logo_size=(200, 100),
+            settings={
+                "x_percent": 0,
+                "y_percent": 0,
+                "size_percent": 20
+            },
+            reserved_box=(35, 18, 300, 90)
+        )
+        logo_box = (
+            position[0],
+            position[1],
+            position[0] + new_size[0],
+            position[1] + new_size[1]
+        )
+
+        self.assertFalse(
+            module.rectangles_overlap(
+                logo_box,
+                (35, 18, 300, 90),
+                padding=15
+            )
+        )
+
+    def test_user_positioned_logo_is_only_added_to_display_image(self):
+        raw = default_components_for_mode("text_to_image")
+        raw["logo"] = {
+            "enabled": True,
+            "rights_confirmed": True,
+            "x_percent": 100,
+            "y_percent": 100,
+            "size_percent": 20
+        }
+        source_bytes = self.make_test_image(800, 450)
+        logo_output = BytesIO()
+        Image.new("RGBA", (200, 100), (230, 35, 45, 255)).save(
+            logo_output,
+            format="PNG"
+        )
+        upload = UploadFile(
+            file=BytesIO(logo_output.getvalue()),
+            filename="test-logo.png"
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            original_generated_dir = module.GENERATED_DIR
+            original_temp_results_dir = module.TEMP_RESULTS_DIR
+
+            try:
+                module.GENERATED_DIR = Path(temporary_directory) / "generated"
+                module.TEMP_RESULTS_DIR = (
+                    Path(temporary_directory) /
+                    "temporary_results"
+                )
+                module.GENERATED_DIR.mkdir(parents=True, exist_ok=True)
+                module.TEMP_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+                module.TEMP_RESULTS.clear()
+
+                with patch.object(
+                    module,
+                    "provider_is_configured",
+                    return_value=True
+                ):
+                    with patch.object(
+                        module,
+                        "request_openai_image",
+                        return_value=source_bytes
+                    ):
+                        with patch.object(
+                            module,
+                            "render_ai_overlay_on_image",
+                            side_effect=lambda image_bytes: image_bytes
+                        ):
+                            response = asyncio.run(
+                                module.run(
+                                    prompt_components=json.dumps(raw),
+                                    mode="text_to_image",
+                                    library_source_id="",
+                                    image_provider="openai",
+                                    logo_file=upload
+                                )
+                            )
+
+                payload = json.loads(response.body.decode("utf-8"))
+                result_id = payload["results"][0]["result_id"]
+                entry = module.TEMP_RESULTS[result_id]
+                saved_source = entry["source_path"].read_bytes()
+                saved_display = entry["display_path"].read_bytes()
+
+                self.assertEqual(saved_source, source_bytes)
+                self.assertNotEqual(saved_display, saved_source)
+                self.assertTrue(payload["prompt_components"]["logo"]["applied"])
+
+                with Image.open(BytesIO(saved_display)) as image:
+                    self.assertEqual(image.getpixel((700, 390))[:3], (230, 35, 45))
+            finally:
+                module.GENERATED_DIR = original_generated_dir
+                module.TEMP_RESULTS_DIR = original_temp_results_dir
+                module.TEMP_RESULTS.clear()
 
     def test_library_only_contains_explicitly_saved_results(self):
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -798,7 +1011,10 @@ class GenerationModeTests(unittest.TestCase):
     def test_real_image_upload_ui_is_removed(self):
         html = module.INDEX_PATH.read_text(encoding="utf-8")
 
-        self.assertNotIn('type="file"', html)
+        self.assertEqual(html.count('type="file"'), 1)
+        self.assertIn('id="logoFile"', html)
+        self.assertNotIn('id="sourceImage"', html)
+        self.assertNotIn('id="personImage"', html)
         self.assertNotIn("consentAccepted", html)
         self.assertNotIn("Eigenes Bild bearbeiten", html)
 

@@ -14,7 +14,8 @@ Images API zur Verfügung.
 
 Ein separater Upload- oder Image-to-Image-Modus für reale Personenbilder ist
 nicht Bestandteil der aktuellen Anwendung. Beide Stufen verwenden dieselbe
-Ergebnisanzeige, optionale Kampagnen-Banner und den Hinweis `KI-generiert`.
+Ergebnisanzeige, optionale Kampagnen-Banner, ein optionales berechtigt
+verwendetes PNG-Logo und den verpflichtenden Hinweis `KI-generiert`.
 
 ## Bildanbieter
 
@@ -121,8 +122,8 @@ Kampagnenbibliothek ab. Gespeichert werden:
 
 - das gekennzeichnete Vorschaubild,
 - ein kleines Vorschaubild für die Bibliotheksansicht,
-- eine saubere interne Bearbeitungsquelle ohne eingebrannten Banner oder
-  `KI-generiert`-Overlay,
+- eine saubere interne Bearbeitungsquelle ohne eingebrannten Banner,
+  Firmenlogo oder `KI-generiert`-Overlay,
 - positiver Prompt und Negative Prompt,
 - Modus, Anbieter, Seed-Verfügbarkeit, Modellbezeichnung und Bildabmessungen,
 - bei verketteten Ergebnissen die Referenz auf das Ausgangsmotiv.
@@ -145,7 +146,12 @@ verlangt ein primäres Optimierungsziel und gliedert den Prompt in:
 
 Ausgewählt werden können Änderungsstärke, Erhaltungsfokus, Tätigkeit,
 Personenzahl und Interaktion, Pose, Blick, Gesichtsausdruck, Rollenwirkung,
-Kampagnenkomposition, Bildwirkung sowie eine konkrete Qualitätskorrektur.
+Bildausschnitt, nutzbare Kampagnentextfläche, Gestaltung dieser Fläche,
+Bildwirkung sowie eine konkrete Qualitätskorrektur. Bildausschnitt und
+Textfläche sind bewusst getrennt: So lassen sich beispielsweise ein
+Halbkörpermotiv und rechts 35 bis 40 Prozent ruhige Textfläche gleichzeitig
+anfordern. Wird dort anschließend ein Banner gesetzt, übernimmt dessen
+Position automatisch die ausgewählte Kampagnenfläche.
 Nicht ausgewählte Merkmale sollen möglichst stabil bleiben. Ein fester Seed
 ermöglicht auch in Stufe 2 besser kontrollierbare Promptvergleiche.
 Die Definition of Done wird als separates menschliches Prüfraster angezeigt
@@ -244,7 +250,21 @@ Hintergrundpersonen werden durch Positivprompt, Negative Prompt und
 Erfolgskriterien ausdrücklich ausgeschlossen; die menschliche Sichtprüfung
 bleibt dennoch verbindlich.
 
-Reale Unternehmenslogos werden nicht durch das Modell generiert und sind nicht Bestandteil des Repositorys. Ein berechtigt verwendetes Logo sollte erst nach der Generierung als exakter Overlay ergänzt werden.
+Reale Unternehmenslogos werden nicht durch das Modell generiert und sind nicht
+Bestandteil des Repositorys. Ein berechtigt verwendetes Logo kann optional als
+PNG ausgewählt, horizontal und vertikal positioniert sowie zwischen 5 und 30
+Prozent der Bildbreite skaliert werden. Die App akzeptiert ausschließlich eine
+lesbare PNG bis 5 MB und kodiert sie ohne eingebettete Metadaten neu. Die Datei
+wird nur im Arbeitsspeicher des aktuellen Generierungsaufrufs verarbeitet.
+
+Banner und Logo werden ausschließlich auf das Anzeige- und Exportbild gelegt.
+Die saubere interne Quelle für eine spätere Prompt-Chain-Stufe bleibt ohne
+diese Gestaltungselemente. Der verpflichtende Hinweis `KI-generiert` wird
+zuletzt oben links ergänzt und kann daher nicht vom Logo verdeckt werden. Bei
+einer Überschneidung verschiebt die App das Logo in den nächstgelegenen freien
+Bereich. Eine Bestätigung in der Oberfläche dokumentiert die beabsichtigte
+berechtigte Verwendung, ersetzt aber keine tatsächlich erforderliche
+Nutzungsberechtigung.
 
 Temporäre Ergebnisse und die bewusst gespeicherte Kampagnenbibliothek liegen
 lokal unter `webapp/data/`. Dieser Bereich wird von Git ignoriert und nicht in
