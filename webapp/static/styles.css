@@ -343,20 +343,14 @@ input[type="range"] {
   font-variant-numeric: tabular-nums;
 }
 
-.logo-rights-confirmation {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
+.logo-usage-notice {
   padding: 12px;
   border: 1px solid #d7c99d;
   border-radius: 11px;
   color: #66531e;
   background: #fff9e9;
+  font-size: 13px;
   line-height: 1.45;
-}
-
-.logo-rights-confirmation input {
-  margin-top: 3px;
 }
 
 .logo-preview-title {
@@ -389,7 +383,7 @@ input[type="range"] {
   position: absolute;
   z-index: 3;
   top: 7%;
-  left: 4%;
+  right: 4%;
   padding: 4px 7px;
   border-radius: 999px;
   color: #ffffff;

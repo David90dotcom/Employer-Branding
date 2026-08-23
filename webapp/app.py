@@ -73,7 +73,7 @@ ASSETS_DIR = BASE_DIR / "static" / "assets"
 ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 
 AI_OVERLAY_PATH = ASSETS_DIR / "ai_generated_overlay.png"
-AI_OVERLAY_POSITION = "top_left"
+AI_OVERLAY_POSITION = "top_right"
 
 MAX_LOGO_UPLOAD_BYTES = 5 * 1024 * 1024
 MAX_LOGO_PIXELS = 16_000_000
@@ -885,11 +885,6 @@ def normalize_logo_settings(raw_components):
         enabled_value
     ).strip().lower() in {"1", "true", "yes", "on"}
 
-    rights_value = raw_logo.get("rights_confirmed", False)
-    rights_confirmed = rights_value is True or str(
-        rights_value
-    ).strip().lower() in {"1", "true", "yes", "on"}
-
     def bounded_integer(name, default, minimum, maximum):
         try:
             value = int(float(raw_logo.get(name, default)))
@@ -900,8 +895,7 @@ def normalize_logo_settings(raw_components):
 
     return {
         "enabled": enabled,
-        "rights_confirmed": rights_confirmed,
-        "x_percent": bounded_integer("x_percent", 100, 0, 100),
+        "x_percent": bounded_integer("x_percent", 0, 0, 100),
         "y_percent": bounded_integer("y_percent", 0, 0, 100),
         "size_percent": bounded_integer(
             "size_percent",
@@ -1286,7 +1280,8 @@ def build_success_criteria(components, selected_options=None):
             "prompt": (
                 "No identifiable real person, model-generated logo, readable "
                 "brand name, tokenism, or stereotypical depiction may appear. "
-                "An authorized logo may only be added as an exact deterministic "
+                "An optional context-supplied logo may only be added as an "
+                "exact deterministic "
                 "PNG overlay after generation."
                 if logo_enabled else
                 "No identifiable real person, logo, readable brand name, "
@@ -1294,7 +1289,7 @@ def build_success_criteria(components, selected_options=None):
             ),
             "label": (
                 "Keine identifizierbare reale Person und kein vom Modell "
-                "erzeugtes Logo; ein berechtigt verwendetes Logo wird nur "
+                "erzeugtes Logo; ein optionales Logo wird nur "
                 "anschließend als exaktes PNG-Overlay ergänzt."
                 if logo_enabled else
                 "Keine identifizierbare reale Person, kein Logo, kein lesbarer "
@@ -1565,16 +1560,16 @@ def build_prompt_chain_success_criteria(components):
         "prompt": (
             "No model-generated company logo, readable brand name, generated "
             "campaign text, real-employee claim, tokenism, or stereotypical "
-            "depiction may appear. An authorized logo may only be added as "
-            "an exact deterministic PNG overlay after generation."
+            "depiction may appear. An optional context-supplied logo may only "
+            "be added as an exact deterministic PNG overlay after generation."
             if logo_enabled else
             "No company logo, readable brand name, generated campaign text, "
             "real-employee claim, tokenism, or stereotypical depiction may "
             "appear."
         ),
         "label": (
-            "Das Modell erzeugt keine Logos oder Markennamen; ein berechtigt "
-            "verwendetes Logo wird ausschließlich anschließend als exaktes "
+            "Das Modell erzeugt keine Logos oder Markennamen; ein optionales "
+            "Logo wird ausschließlich anschließend als exaktes "
             "PNG-Overlay ergänzt."
             if logo_enabled else
             "Keine Logos, lesbaren Markennamen, generierten Kampagnentexte, "
@@ -2442,15 +2437,6 @@ async def read_logo_upload(logo_file, logo_settings):
     if not logo_settings.get("enabled"):
         return None
 
-    if not logo_settings.get("rights_confirmed"):
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Bitte bestätige vor der Verwendung, dass du zur Nutzung "
-                "der Logo-Datei berechtigt bist."
-            )
-        )
-
     if logo_file is None or not hasattr(logo_file, "read"):
         raise HTTPException(
             status_code=400,
@@ -2615,7 +2601,7 @@ def render_logo_overlay_on_image(image_bytes, logo_bytes, settings):
 
 
 def render_ai_overlay_on_image(image_bytes):
-    """Place the mandatory transparent AI label in the upper-left corner."""
+    """Place the mandatory transparent AI label in the upper-right corner."""
     if not AI_OVERLAY_PATH.exists():
         print(
             f"WARNUNG: AI-Overlay nicht gefunden: {AI_OVERLAY_PATH}"

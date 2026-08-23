@@ -250,11 +250,12 @@
       <div class="field">
         <label>
           <input id="logoEnabled" type="checkbox">
-          Berechtigt verwendetes Firmenlogo als PNG aufsetzen
+          Firmenlogo als PNG hinzufügen (optional)
         </label>
         <span class="field-help">
           Das Logo wird nicht von der Bild-KI erzeugt. Es wird ausschließlich
           nach der Generierung als exakte PNG-Datei auf das Anzeigebild gelegt.
+          Die zulässige Verwendung richtet sich nach dem jeweiligen Kontext.
         </span>
       </div>
 
@@ -278,8 +279,8 @@
             <div class="field">
               <label for="logoPreset">Schnellposition</label>
               <select id="logoPreset">
-                <option value="top_right" selected>Oben rechts</option>
-                <option value="top_left_below_label">Oben links · unter KI-Hinweis</option>
+                <option value="top_left" selected>Oben links</option>
+                <option value="top_right_below_label">Oben rechts · unter KI-Hinweis</option>
                 <option value="bottom_right">Unten rechts</option>
                 <option value="bottom_left">Unten links</option>
                 <option value="custom">Benutzerdefiniert</option>
@@ -290,9 +291,9 @@
               <div class="field">
                 <label for="logoX">
                   Horizontale Position
-                  <output id="logoXValue" for="logoX">100 %</output>
+                  <output id="logoXValue" for="logoX">0 %</output>
                 </label>
-                <input id="logoX" type="range" min="0" max="100" value="100">
+                <input id="logoX" type="range" min="0" max="100" value="0">
               </div>
 
               <div class="field">
@@ -312,11 +313,12 @@
               </div>
             </div>
 
-            <label class="logo-rights-confirmation">
-              <input id="logoRightsConfirmed" type="checkbox">
-              Ich bestätige, dass ich zur Verwendung der ausgewählten
-              Logo-Datei berechtigt bin.
-            </label>
+            <div class="logo-usage-notice">
+              Hinweis: Ob und wie ein Logo verwendet werden darf, richtet sich
+              nach dem jeweiligen Studien-, Demonstrations- oder
+              Anwendungskontext. Die App nimmt hierzu keine rechtliche
+              Bewertung vor.
+            </div>
           </div>
 
           <div>
@@ -329,7 +331,7 @@
               <img id="logoPreview" alt="Vorschau des ausgewählten Logos" hidden>
             </div>
             <span class="field-help">
-              Oben links bleibt für die verpflichtende KI-Kennzeichnung
+              Oben rechts bleibt für die verpflichtende KI-Kennzeichnung
               reserviert. Bei einer Überschneidung verschiebt die App das Logo
               automatisch in den nächstgelegenen freien Bereich.
             </span>
@@ -527,7 +529,6 @@
     const logoXValue = document.getElementById("logoXValue");
     const logoYValue = document.getElementById("logoYValue");
     const logoSizeValue = document.getElementById("logoSizeValue");
-    const logoRightsConfirmed = document.getElementById("logoRightsConfirmed");
     const logoPreview = document.getElementById("logoPreview");
     const logoPreviewPlaceholder = document.getElementById("logoPreviewPlaceholder");
 
@@ -1322,8 +1323,8 @@
 
     function applyLogoPreset(preset) {
       const positions = {
-        top_right: [100, 0],
-        top_left_below_label: [0, 24],
+        top_left: [0, 0],
+        top_right_below_label: [100, 24],
         bottom_right: [100, 100],
         bottom_left: [0, 100]
       };
@@ -1369,7 +1370,6 @@
     function collectLogoSettings() {
       return {
         enabled: Boolean(logoEnabled.checked),
-        rights_confirmed: Boolean(logoRightsConfirmed.checked),
         x_percent: Number.parseInt(logoX.value, 10),
         y_percent: Number.parseInt(logoY.value, 10),
         size_percent: Number.parseInt(logoSize.value, 10)
@@ -2031,11 +2031,6 @@
       });
     }
 
-    logoRightsConfirmed.addEventListener(
-      "change",
-      schedulePromptPreview
-    );
-
     function updateSeedState() {
       fixedSeed.disabled = (
         !getCurrentProvider()?.supports_seed ||
@@ -2157,12 +2152,6 @@
           return;
         }
 
-        if (!logoRightsConfirmed.checked) {
-          alert(
-            "Bitte bestätige, dass du zur Verwendung der Logo-Datei berechtigt bist."
-          );
-          return;
-        }
       }
 
       const preview = await requestPromptPreview();

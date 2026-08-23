@@ -748,7 +748,6 @@ class GenerationModeTests(unittest.TestCase):
         raw = default_components_for_mode("text_to_image")
         raw["logo"] = {
             "enabled": True,
-            "rights_confirmed": True,
             "x_percent": 170,
             "y_percent": -25,
             "size_percent": 80
@@ -772,20 +771,19 @@ class GenerationModeTests(unittest.TestCase):
             )
         )
 
-    def test_logo_upload_requires_rights_confirmation(self):
+    def test_logo_upload_requires_a_png_when_enabled(self):
         with self.assertRaises(HTTPException) as raised:
             asyncio.run(
                 module.read_logo_upload(
                     None,
                     {
-                        "enabled": True,
-                        "rights_confirmed": False
+                        "enabled": True
                     }
                 )
             )
 
         self.assertEqual(raised.exception.status_code, 400)
-        self.assertIn("berechtigt", raised.exception.detail)
+        self.assertIn("keine PNG", raised.exception.detail)
 
     def test_logo_upload_accepts_only_sanitized_png(self):
         png_bytes = self.make_test_image(240, 120)
@@ -833,11 +831,26 @@ class GenerationModeTests(unittest.TestCase):
             )
         )
 
+    def test_ai_label_and_placement_preview_use_upper_right(self):
+        new_size, position = module.calculate_ai_overlay_layout(
+            base_size=(1000, 500),
+            overlay_size=(300, 80)
+        )
+        html = module.INDEX_PATH.read_text(encoding="utf-8")
+
+        self.assertEqual(module.AI_OVERLAY_POSITION, "top_right")
+        self.assertGreater(position[0], 500)
+        self.assertLess(position[1], 100)
+        self.assertGreater(new_size[0], 0)
+        self.assertIn(
+            "Oben rechts bleibt für die verpflichtende KI-Kennzeichnung",
+            html
+        )
+
     def test_user_positioned_logo_is_only_added_to_display_image(self):
         raw = default_components_for_mode("text_to_image")
         raw["logo"] = {
             "enabled": True,
-            "rights_confirmed": True,
             "x_percent": 100,
             "y_percent": 100,
             "size_percent": 20
