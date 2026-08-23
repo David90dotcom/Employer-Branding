@@ -31,7 +31,8 @@ COMFY_PYTHON = COMFY_DIR / "venv" / "Scripts" / "python.exe"
 HOST = "127.0.0.1"
 
 COMFY_PORT = 8188
-WEBAPP_PORT = 8000
+WEBAPP_DEFAULT_PORT = 8765
+WEBAPP_PORT = WEBAPP_DEFAULT_PORT
 
 COMFY_URL = f"http://{HOST}:{COMFY_PORT}"
 WEBAPP_URL = f"http://{HOST}:{WEBAPP_PORT}"
@@ -108,6 +109,35 @@ def is_port_open(host: str, port: int, timeout: float = 1.0) -> bool:
             return True
     except OSError:
         return False
+
+
+def find_available_port(preferred_port: int, attempts: int = 30) -> int:
+    """Return the preferred local port or the next available one."""
+    for candidate in range(preferred_port, preferred_port + attempts):
+        if not is_port_open(HOST, candidate):
+            return candidate
+
+    raise RuntimeError(
+        f"Kein freier Web-App-Port im Bereich "
+        f"{preferred_port}–{preferred_port + attempts - 1} gefunden."
+    )
+
+
+def configure_webapp_port() -> None:
+    """Select a free project-specific port and refresh dependent URLs."""
+    global WEBAPP_PORT, WEBAPP_URL, WEBAPP_HEALTH_URL
+
+    selected_port = find_available_port(WEBAPP_DEFAULT_PORT)
+
+    if selected_port != WEBAPP_DEFAULT_PORT:
+        print(
+            f"Web-App-Port {WEBAPP_DEFAULT_PORT} ist belegt. "
+            f"Verwende automatisch Port {selected_port}."
+        )
+
+    WEBAPP_PORT = selected_port
+    WEBAPP_URL = f"http://{HOST}:{WEBAPP_PORT}"
+    WEBAPP_HEALTH_URL = f"{WEBAPP_URL}/api/ui-fields"
 
 
 def url_responds(
@@ -372,29 +402,36 @@ def main() -> int:
     webapp_process: Optional[subprocess.Popen] = None
 
     try:
+        configure_webapp_port()
         print_configuration()
         validate_paths()
         print_log_hint()
 
-        ensure_port_is_free(COMFY_PORT, "ComfyUI")
         ensure_port_is_free(WEBAPP_PORT, "Web-App")
 
-        comfy_process = start_comfy()
-
-        print(f"Warte auf ComfyUI: {COMFY_HEALTH_URL}")
-
-        if not wait_for_url(
-            url=COMFY_HEALTH_URL,
-            timeout=COMFY_START_TIMEOUT,
-            process=comfy_process,
-            label="ComfyUI"
-        ):
-            raise RuntimeError(
-                f"ComfyUI antwortet nach {COMFY_START_TIMEOUT} Sekunden "
-                f"noch nicht unter:\n{COMFY_HEALTH_URL}"
+        if url_responds(COMFY_HEALTH_URL):
+            print(
+                f"ComfyUI läuft bereits unter {COMFY_URL} "
+                "und wird wiederverwendet."
             )
+        else:
+            ensure_port_is_free(COMFY_PORT, "ComfyUI")
+            comfy_process = start_comfy()
 
-        print("ComfyUI ist erreichbar.")
+            print(f"Warte auf ComfyUI: {COMFY_HEALTH_URL}")
+
+            if not wait_for_url(
+                url=COMFY_HEALTH_URL,
+                timeout=COMFY_START_TIMEOUT,
+                process=comfy_process,
+                label="ComfyUI"
+            ):
+                raise RuntimeError(
+                    f"ComfyUI antwortet nach {COMFY_START_TIMEOUT} Sekunden "
+                    f"noch nicht unter:\n{COMFY_HEALTH_URL}"
+                )
+
+            print("ComfyUI ist erreichbar.")
 
         webapp_process = start_webapp()
 

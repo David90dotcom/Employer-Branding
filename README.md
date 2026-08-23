@@ -123,7 +123,7 @@ Der Text-to-Image-Workflow orientiert sich am nativen Qwen-Image-2512-Workflow v
    python main.py
    ```
 
-Die Web-App wird anschließend lokal unter `http://127.0.0.1:8000` geöffnet. ComfyUI läuft lokal unter `http://127.0.0.1:8188`.
+Die Web-App wird anschließend lokal unter `http://127.0.0.1:8765` geöffnet. Ist dieser projektspezifische Standardport bereits belegt, wählt der Launcher automatisch den nächsten freien Port und zeigt die tatsächlich verwendete Adresse an. Eine bereits unter `http://127.0.0.1:8188` laufende ComfyUI-Instanz wird wiederverwendet, statt einen zweiten Prozess zu starten.
 
 ## Modellwechsel
 
