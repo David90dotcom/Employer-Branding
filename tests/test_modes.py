@@ -1037,9 +1037,59 @@ class GenerationModeTests(unittest.TestCase):
         html = module.INDEX_PATH.read_text(encoding="utf-8")
 
         self.assertIn("Vereinfachtes Text- und Layoutwerkzeug", html)
+        self.assertIn('<textarea\n            id="bannerText"', html)
         self.assertIn('id="bannerFontScale"', html)
         self.assertIn("Layout ohne KI anwenden", html)
         self.assertIn('fetch(\n          "/api/layout/apply"', html)
+
+    def test_banner_editor_uses_readable_lines_and_manual_breaks(self):
+        class FakeFont:
+            def __init__(self, size):
+                self.size = size
+
+        class FakeDraw:
+            @staticmethod
+            def textbbox(position, text, font):
+                width = int(len(text) * font.size * 0.5)
+                return (0, 0, width, font.size)
+
+        with patch.object(
+            module,
+            "load_font",
+            side_effect=lambda style, size, bold=False: FakeFont(size)
+        ):
+            _, automatic_lines, _ = module.fit_text(
+                draw=FakeDraw(),
+                text="Ein Studium. Drei Praxiswelten.",
+                font_style="bold",
+                max_width=300,
+                max_height=180,
+                max_size=40,
+                min_size=20,
+                bold=True,
+                preferred_max_lines=2
+            )
+            _, manual_lines, _ = module.fit_text(
+                draw=FakeDraw(),
+                text="Ein Studium.\nDrei Praxiswelten.",
+                font_style="bold",
+                max_width=300,
+                max_height=180,
+                max_size=40,
+                min_size=20,
+                bold=True,
+                preferred_max_lines=2
+            )
+
+        self.assertLessEqual(len(automatic_lines), 2)
+        self.assertNotEqual(
+            automatic_lines,
+            ["Ein Studium.", "Drei", "Praxiswelten."]
+        )
+        self.assertEqual(
+            manual_lines,
+            ["Ein Studium.", "Drei Praxiswelten."]
+        )
 
     def test_library_only_contains_explicitly_saved_results(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

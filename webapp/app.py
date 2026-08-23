@@ -2043,25 +2043,29 @@ def text_size(draw, text, font):
 
 
 def wrap_text(draw, text, font, max_width):
-    words = text.split()
-
-    if not words:
-        return []
-
     lines = []
-    current = words[0]
 
-    for word in words[1:]:
-        test = current + " " + word
-        width, _ = text_size(draw, test, font)
+    for paragraph in str(text or "").splitlines() or [""]:
+        words = paragraph.split()
 
-        if width <= max_width:
-            current = test
-        else:
-            lines.append(current)
-            current = word
+        if not words:
+            if lines and lines[-1] != "":
+                lines.append("")
+            continue
 
-    lines.append(current)
+        current = words[0]
+
+        for word in words[1:]:
+            test = current + " " + word
+            width, _ = text_size(draw, test, font)
+
+            if width <= max_width:
+                current = test
+            else:
+                lines.append(current)
+                current = word
+
+        lines.append(current)
 
     return lines
 
@@ -2074,8 +2078,11 @@ def fit_text(
     max_height,
     max_size,
     min_size,
-    bold=True
+    bold=True,
+    preferred_max_lines=None
 ):
+    largest_valid = None
+
     for size in range(max_size, min_size - 1, -2):
         font = load_font(
             font_style,
@@ -2105,7 +2112,19 @@ def fit_text(
         )
 
         if widest <= max_width and total_height <= max_height:
-            return font, lines, total_height
+            candidate = (font, lines, total_height)
+
+            if largest_valid is None:
+                largest_valid = candidate
+
+            if (
+                preferred_max_lines is None or
+                len(lines) <= preferred_max_lines
+            ):
+                return candidate
+
+    if largest_valid is not None:
+        return largest_valid
 
     font = load_font(
         font_style,
@@ -2267,7 +2286,8 @@ def render_banner_on_image(image_bytes, banner):
         max_height=headline_max_height,
         max_size=max(44, min(96, max_headline_size)),
         min_size=26,
-        bold=True
+        bold=True,
+        preferred_max_lines=2
     )
 
     sub_font = None
@@ -2283,7 +2303,8 @@ def render_banner_on_image(image_bytes, banner):
             max_height=int(box_height * 0.28),
             max_size=max(22, int(max_headline_size * 0.42)),
             min_size=16,
-            bold=False
+            bold=False,
+            preferred_max_lines=1
         )
 
     line_gap = int(headline_font.size * 0.25)
