@@ -1716,7 +1716,7 @@
           },
           chainGoal: {
             title: "1 · Root Task und Kontinuität",
-            description: "Ein primäres Optimierungsziel, kontrollierte Änderungsstärke und klare Erhaltungsregeln"
+            description: "Optionales Gesamtziel, kontrollierte Änderungsstärke und klare Erhaltungsregeln"
           },
           chainScene: {
             title: "2 · Kampagnenszene optimieren",
@@ -2166,17 +2166,11 @@
       const components = preview.components;
       const prompt = preview.prompt;
 
-      if (currentMode === "prompt_chain" && !components.optimizationGoal) {
-        alert(
-          "Bitte für die zweite Prompt-Stufe zuerst ein primäres Optimierungsziel auswählen."
-        );
-        setStatus("Optimierung noch nicht gestartet: Primäres Ziel fehlt.");
-        return;
-      }
-
       if (!prompt) {
         alert(
-          "Bitte mindestens eine Auswahl treffen oder einen Freitext-Prompt eingeben."
+          currentMode === "prompt_chain"
+            ? "Bitte mindestens eine konkrete Bildänderung auswählen, ein optionales Optimierungsziel festlegen oder einen Freitext-Prompt eingeben."
+            : "Bitte mindestens eine Auswahl treffen oder einen Freitext-Prompt eingeben."
         );
 
         return;

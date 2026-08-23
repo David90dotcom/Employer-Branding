@@ -1,12 +1,11 @@
 [
   {
     "id": "optimizationGoal",
-    "label": "Primäres Optimierungsziel",
-    "help": "Pro Durchlauf ein Hauptziel wählen. So bleibt die zweite Prompt-Stufe fokussiert und das Ergebnis besser vergleichbar.",
-    "required": true,
+    "label": "Übergeordnetes Optimierungsziel (optional)",
+    "help": "Optional. Bleibt dieses Feld leer, leitet die App den Änderungsauftrag direkt aus den ausgewählten Einzelparametern ab.",
     "options": [
       {
-        "label": "Bitte Optimierungsziel auswählen",
+        "label": "Kein übergeordnetes Ziel · nur gewählte Merkmale ändern",
         "value": ""
       },
       {

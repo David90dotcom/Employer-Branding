@@ -135,7 +135,8 @@ dass der Transparenzhinweis oder ein zuvor eingefügter Banner Teil der nächste
 Bildgenerierung wird.
 
 Die zweite Stufe ist als kontrollierte Kampagnenoptimierung aufgebaut. Sie
-verlangt ein primäres Optimierungsziel und gliedert den Prompt in:
+kann optional ein übergeordnetes Optimierungsziel verwenden und gliedert den
+Prompt in:
 
 1. `ROLE AND METHOD`
 2. `PRIMARY OPTIMIZATION TASK`
@@ -143,6 +144,12 @@ verlangt ein primäres Optimierungsziel und gliedert den Prompt in:
 4. `REQUESTED VISUAL CHANGES`
 5. `CONSTRAINTS`
 6. `OUTPUT`
+
+Bleibt das übergeordnete Ziel leer, leitet die Anwendung den Root Task direkt
+aus den ausgewählten Einzeländerungen ab. So kann beispielsweise ausschließlich
+der Bildausschnitt oder die nutzbare Textfläche angepasst werden. Mindestens
+eine tatsächliche Bildänderung oder ein Freitextauftrag bleibt erforderlich;
+die voreingestellte Änderungsstärke allein startet keine Bearbeitung.
 
 Ausgewählt werden können Änderungsstärke, Erhaltungsfokus, Tätigkeit,
 Personenzahl und Interaktion, Pose, Blick, Gesichtsausdruck, Rollenwirkung,

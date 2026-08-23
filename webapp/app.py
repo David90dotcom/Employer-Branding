@@ -1555,6 +1555,7 @@ def build_text_to_image_sections(components):
 
 
 def build_prompt_chain_success_criteria(components):
+    optimization_goal = components.get("optimizationGoal", "")
     logo_enabled = components.get("logo", {}).get("enabled", False)
     logo_criterion = {
         "prompt": (
@@ -1582,10 +1583,16 @@ def build_prompt_chain_success_criteria(components):
             "prompt": (
                 "The primary optimization goal must be clearly visible in "
                 "the revised campaign image."
+                if optimization_goal else
+                "The explicitly selected visual refinement must be clearly "
+                "visible in the revised campaign image."
             ),
             "label": (
                 "Das primäre Optimierungsziel ist im überarbeiteten Motiv "
                 "klar erkennbar."
+                if optimization_goal else
+                "Die ausdrücklich ausgewählte Bildänderung ist im "
+                "überarbeiteten Motiv klar erkennbar."
             )
         },
         {
@@ -1699,46 +1706,10 @@ def build_prompt_chain_success_criteria(components):
 
 def build_prompt_chain_sections(components):
     optimization_goal = components.get("optimizationGoal", "")
-
-    if not optimization_goal:
-        return []
-
     change_strength = components.get("changeStrength", "")
     preservation_focus = components.get("preservationFocus", "")
     extra_prompt = components.get("extraPrompt", "")
     banner = components.get("banner", {})
-
-    role_text = (
-        "Apply the visual judgement of a professional employer-branding "
-        "campaign art director. This is stage 2 of a prompt chain: use the "
-        "supplied result from stage 1 as the visual source and perform one "
-        "focused refinement instead of creating an unrelated new scene."
-    )
-
-    task_parts = [ensure_sentence(optimization_goal)]
-
-    if change_strength:
-        task_parts.append(ensure_sentence(change_strength))
-
-    task_text = " ".join(task_parts)
-
-    source_parts = [
-        (
-            "The source image and every person shown in it are fully synthetic. "
-            "Preserve the fictional main person's recognizable face structure, "
-            "hairstyle, apparent age, skin tone, natural body proportions, and "
-            "overall visual continuity."
-        )
-    ]
-
-    if preservation_focus:
-        source_parts.append(ensure_sentence(preservation_focus))
-
-    source_parts.append(
-        "Treat the source image as visual material, not as evidence of a real "
-        "employee or a real workplace event."
-    )
-    source_text = " ".join(source_parts)
 
     requested_fields = [
         ("Workplace activity", components.get("workActivity", "")),
@@ -1765,15 +1736,69 @@ def build_prompt_chain_sections(components):
             ensure_sentence(extra_prompt)
         )
 
+    banner_requests_layout_change = bool(banner.get("enabled"))
+
+    if not (
+        optimization_goal or
+        requested_parts or
+        banner_requests_layout_change
+    ):
+        return []
+
+    role_text = (
+        "Apply the visual judgement of a professional employer-branding "
+        "campaign art director. This is stage 2 of a prompt chain: use the "
+        "supplied result from stage 1 as the visual source and perform one "
+        "focused refinement instead of creating an unrelated new scene."
+    )
+
+    task_parts = [
+        ensure_sentence(optimization_goal)
+        if optimization_goal else
+        (
+            "Use the explicitly selected visual changes below as the complete "
+            "optimization task. Do not introduce an additional campaign "
+            "reinterpretation or change any unselected image element."
+        )
+    ]
+
+    if change_strength:
+        task_parts.append(ensure_sentence(change_strength))
+
+    task_text = " ".join(task_parts)
+
+    source_parts = [
+        (
+            "The source image and every person shown in it are fully synthetic. "
+            "Preserve the fictional main person's recognizable face structure, "
+            "hairstyle, apparent age, skin tone, natural body proportions, and "
+            "overall visual continuity."
+        )
+    ]
+
+    if preservation_focus:
+        source_parts.append(ensure_sentence(preservation_focus))
+
+    source_parts.append(
+        "Treat the source image as visual material, not as evidence of a real "
+        "employee or a real workplace event."
+    )
+    source_text = " ".join(source_parts)
+
     if requested_parts:
         requested_text = "\n".join(
             f"- {part}"
             for part in requested_parts
         )
-    else:
+    elif optimization_goal:
         requested_text = (
             "Apply the primary optimization task without introducing any "
             "additional scene, person, styling, or composition change."
+        )
+    else:
+        requested_text = (
+            "Prepare only the campaign-layout space requested in OUTPUT and "
+            "do not alter any unrelated image element."
         )
 
     constraints_text = (

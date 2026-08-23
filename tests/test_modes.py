@@ -715,7 +715,29 @@ class GenerationModeTests(unittest.TestCase):
 
         self.assertEqual(components["spaceTreatment"], "")
 
-    def test_prompt_chain_requires_a_primary_optimization_goal(self):
+    def test_prompt_chain_derives_task_from_change_without_primary_goal(self):
+        fields = {
+            field["id"]: field
+            for field in module.load_ui_fields("prompt_chain")
+        }
+        raw = default_components_for_mode("prompt_chain")
+        raw["framing"] = fields["framing"]["options"][1]["value"]
+        components = module.normalize_prompt_components(raw, "prompt_chain")
+        package = module.build_prompt_package(components, "prompt_chain")
+
+        self.assertFalse(fields["optimizationGoal"].get("required", False))
+        self.assertTrue(package["positive_prompt"])
+        self.assertIn(
+            "explicitly selected visual changes below as the complete",
+            package["positive_prompt"]
+        )
+        self.assertIn("medium environmental shot", package["positive_prompt"])
+        self.assertIn(
+            "Die ausdrücklich ausgewählte Bildänderung",
+            package["success_criteria"][0]["label"]
+        )
+
+    def test_prompt_chain_rejects_a_no_change_request(self):
         raw = default_components_for_mode("prompt_chain")
         components = module.normalize_prompt_components(raw, "prompt_chain")
         package = module.build_prompt_package(components, "prompt_chain")
