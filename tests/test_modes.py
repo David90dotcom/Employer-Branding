@@ -58,11 +58,13 @@ class GenerationModeTests(unittest.TestCase):
             "text_to_image"
         )
 
-        self.assertIn("TASK AND CAMPAIGN GOAL", prompt)
-        self.assertIn("completely fictional", prompt)
-        self.assertIn("SUCCESS CRITERIA", prompt)
+        self.assertIn("VISIBLE CAMPAIGN INTENT", prompt)
+        self.assertIn("clearly adult", prompt)
         self.assertIn("adult aged 18 or older", prompt)
-        self.assertIn("no children, minors", prompt)
+        self.assertIn("Do not depict children, minors", prompt)
+        self.assertNotIn("SUCCESS CRITERIA", prompt)
+        self.assertNotIn("North Rhine-Westphalia", prompt)
+        self.assertNotIn("school graduates", prompt)
         self.assertNotIn("uploaded person", prompt.lower())
 
     def test_text_to_image_excludes_minors_and_ambiguous_background_people(self):
@@ -129,14 +131,46 @@ class GenerationModeTests(unittest.TestCase):
 
         self.assertEqual(
             [section["title"] for section in package["sections"]],
-            list(module.TEXT_TO_IMAGE_SECTION_TITLES.values())
+            list(module.TEXT_TO_IMAGE_RENDER_SECTION_TITLES.values())
+        )
+        self.assertEqual(package["render_sections"], package["sections"])
+        self.assertEqual(
+            package["render_prompt"],
+            package["positive_prompt"]
         )
         self.assertGreaterEqual(len(package["success_criteria"]), 4)
+        self.assertGreaterEqual(len(package["briefing_sections"]), 4)
+        self.assertEqual(len(package["translation_steps"]), 3)
         self.assertIn("company logo", package["negative_prompt"])
         self.assertIn(
+            "Schulabgänger:innen in NRW",
+            " ".join(
+                section["text"]
+                for section in package["briefing_sections"]
+            )
+        )
+        self.assertNotIn(
             "North Rhine-Westphalia",
             package["positive_prompt"]
         )
+
+    def test_campaign_strategy_is_translated_into_visible_evidence(self):
+        raw = default_components_for_mode("text_to_image")
+        components = module.normalize_prompt_components(
+            raw,
+            "text_to_image"
+        )
+        package = module.build_prompt_package(
+            components,
+            "text_to_image"
+        )
+
+        render_prompt = package["render_prompt"]
+        self.assertIn("actively applying guidance", render_prompt)
+        self.assertIn("shared attention to the same task", render_prompt)
+        self.assertIn("avoid a posed recruiting portrait", render_prompt)
+        self.assertNotIn("Human review is required", render_prompt)
+        self.assertNotIn("Kampagnenziel", render_prompt)
 
     def test_prompt_chain_uses_a_saved_synthetic_source(self):
         self.assertTrue(
@@ -172,7 +206,7 @@ class GenerationModeTests(unittest.TestCase):
         self.assertIn("PRIMARY OPTIMIZATION TASK", prompt)
         self.assertIn("SOURCE AND PRESERVATION", prompt)
         self.assertIn("REQUESTED VISUAL CHANGES", prompt)
-        self.assertIn("OUTPUT AND DEFINITION OF DONE", prompt)
+        self.assertIn("\nOUTPUT\n", prompt)
         self.assertIn("fully synthetic", prompt)
         self.assertNotIn("uploaded person's identity", prompt.lower())
         self.assertEqual(
@@ -186,7 +220,7 @@ class GenerationModeTests(unittest.TestCase):
             "qwen_image_edit_2509_fp8_e4m3fn.safetensors"
         )
 
-    def test_prompt_chain_exposes_focus_constraints_and_definition_of_done(self):
+    def test_prompt_chain_separates_render_prompt_and_evaluation_criteria(self):
         fields = module.load_ui_fields("prompt_chain")
         raw = {
             field["id"]: field["options"][1]["value"]
@@ -212,7 +246,9 @@ class GenerationModeTests(unittest.TestCase):
         )
         self.assertIn("adult aged 18 or older", package["positive_prompt"])
         self.assertIn("Do not add children, minors", package["positive_prompt"])
-        self.assertIn("Definition of done", package["positive_prompt"])
+        self.assertNotIn("Definition of done", package["positive_prompt"])
+        self.assertEqual(package["briefing_sections"], [])
+        self.assertEqual(package["translation_steps"], [])
 
     def test_prompt_chain_fields_cover_campaign_optimization(self):
         field_ids = {

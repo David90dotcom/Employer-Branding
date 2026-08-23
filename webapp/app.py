@@ -94,15 +94,26 @@ LIBRARY_SAVEABLE_MODES = {
     "prompt_chain"
 }
 
-TEXT_TO_IMAGE_SECTION_TITLES = {
-    "creative_direction": "CREATIVE ROLE / DIRECTION",
-    "task_goal": "TASK AND CAMPAIGN GOAL",
-    "context": "CONTEXT",
-    "visual_specification": "VISUAL SPECIFICATION",
-    "constraints": "CONSTRAINTS",
-    "output_format": "OUTPUT FORMAT",
-    "success_criteria": "SUCCESS CRITERIA"
+TEXT_TO_IMAGE_BRIEFING_SECTION_TITLES = {
+    "campaign_goal": "KAMPAGNENZIEL",
+    "target_context": "ZIELGRUPPE UND KONTEXT",
+    "employer_benefit": "ARBEITGEBERNUTZEN",
+    "competitor_insight": "WETTBEWERBSIMPULS",
+    "creative_direction": "GESTALTUNGSRAHMEN"
 }
+
+TEXT_TO_IMAGE_RENDER_SECTION_TITLES = {
+    "visual_direction": "VISUAL DIRECTION",
+    "visible_campaign_intent": "VISIBLE CAMPAIGN INTENT",
+    "subjects_workplace": "SUBJECTS AND WORKPLACE",
+    "action_appearance": "ACTION AND APPEARANCE",
+    "composition_light": "COMPOSITION AND LIGHT",
+    "visual_constraints": "VISUAL CONSTRAINTS",
+    "output": "OUTPUT"
+}
+
+# Backward-compatible name for integrations that already inspect this mapping.
+TEXT_TO_IMAGE_SECTION_TITLES = TEXT_TO_IMAGE_RENDER_SECTION_TITLES
 
 PROMPT_CHAIN_SECTION_TITLES = {
     "role_method": "ROLE AND METHOD",
@@ -110,7 +121,7 @@ PROMPT_CHAIN_SECTION_TITLES = {
     "source_preservation": "SOURCE AND PRESERVATION",
     "requested_changes": "REQUESTED VISUAL CHANGES",
     "constraints": "CONSTRAINTS",
-    "output_criteria": "OUTPUT AND DEFINITION OF DONE"
+    "output_criteria": "OUTPUT"
 }
 
 OUTPUT_FORMATS = {
@@ -775,6 +786,135 @@ def ensure_sentence(value):
     return text
 
 
+def get_selected_ui_options(components, mode):
+    """Return the configured option metadata for each selected field value."""
+    selected = {}
+
+    for field in load_ui_fields(mode):
+        field_id = field.get("id")
+        selected_value = str(components.get(field_id, "") or "").strip()
+
+        if not field_id or not selected_value:
+            continue
+
+        for option in field.get("options", []):
+            if str(option.get("value", "")) == selected_value:
+                selected[field_id] = option
+                break
+
+    return selected
+
+
+def selected_option_label(selected_options, field_id):
+    option = selected_options.get(field_id, {})
+    return str(option.get("label", "") or "").strip()
+
+
+def build_text_to_image_briefing_sections(
+    components,
+    selected_options=None
+):
+    """Build the campaign rationale that remains outside the model prompt."""
+    selected_options = selected_options or get_selected_ui_options(
+        components,
+        "text_to_image"
+    )
+
+    campaign_goal = selected_option_label(
+        selected_options,
+        "campaignGoal"
+    )
+    target_group = selected_option_label(
+        selected_options,
+        "targetGroup"
+    )
+    employer_context = selected_option_label(
+        selected_options,
+        "employerContext"
+    )
+    employer_benefit = selected_option_label(
+        selected_options,
+        "employerBenefit"
+    )
+    competitor_insight = selected_option_label(
+        selected_options,
+        "competitorInsight"
+    )
+    creative_direction = selected_option_label(
+        selected_options,
+        "creativeDirection"
+    )
+
+    section_values = []
+
+    if campaign_goal:
+        section_values.append(("campaign_goal", campaign_goal))
+
+    target_context_parts = []
+
+    if target_group:
+        target_context_parts.append("Zielgruppe: " + target_group)
+
+    if employer_context:
+        target_context_parts.append("Kontext: " + employer_context)
+
+    if target_context_parts:
+        section_values.append(
+            ("target_context", "; ".join(target_context_parts))
+        )
+
+    if employer_benefit:
+        section_values.append(("employer_benefit", employer_benefit))
+
+    if competitor_insight:
+        section_values.append(("competitor_insight", competitor_insight))
+
+    if creative_direction:
+        section_values.append(("creative_direction", creative_direction))
+
+    return [
+        {
+            "id": section_id,
+            "title": TEXT_TO_IMAGE_BRIEFING_SECTION_TITLES[section_id],
+            "text": text
+        }
+        for section_id, text in section_values
+    ]
+
+
+def build_text_to_image_translation_steps(
+    components,
+    selected_options=None
+):
+    """Translate abstract campaign choices into observable image evidence."""
+    selected_options = selected_options or get_selected_ui_options(
+        components,
+        "text_to_image"
+    )
+    steps = []
+
+    for field_id in (
+        "campaignGoal",
+        "employerBenefit",
+        "competitorInsight"
+    ):
+        option = selected_options.get(field_id, {})
+        instruction = str(
+            option.get("visual_translation", "") or ""
+        ).strip()
+
+        if not instruction:
+            continue
+
+        steps.append({
+            "field_id": field_id,
+            "source": str(option.get("label", "") or "").strip(),
+            "instruction": ensure_sentence(instruction)
+        })
+
+    return steps
+
+
 def build_success_criteria(components):
     criteria = [
         {
@@ -846,50 +986,55 @@ def build_success_criteria(components):
     return criteria
 
 
-def build_text_to_image_sections(components):
+def build_text_to_image_render_sections(
+    components,
+    selected_options=None
+):
+    """Build only visually actionable instructions for the image model."""
+    selected_options = selected_options or get_selected_ui_options(
+        components,
+        "text_to_image"
+    )
     creative_direction = components.get("creativeDirection", "") or (
         "Use the visual language of professional employer-branding campaign "
         "photography with authentic documentary realism."
     )
 
-    task_parts = [
-        components.get("campaignGoal", ""),
-        components.get("employerBenefit", "")
-    ]
-    task_text = " ".join(
-        ensure_sentence(part)
-        for part in task_parts
-        if part
+    translation_steps = build_text_to_image_translation_steps(
+        components,
+        selected_options
+    )
+    visible_intent_text = " ".join(
+        step["instruction"]
+        for step in translation_steps
     ) or (
-        "Create a completely fictional recruiting image that communicates a "
-        "credible employer benefit."
+        "Make the recruiting message visible through an observable workplace "
+        "activity rather than generated campaign text."
     )
 
-    context_parts = [
-        components.get("targetGroup", ""),
-        components.get("employerContext", ""),
-        components.get("competitorInsight", "")
-    ]
-    context_text = " ".join(
-        ensure_sentence(part)
-        for part in context_parts
-        if part
-    ) or (
-        "The image is intended for an early-career employer-branding campaign."
-    )
+    subject_parts = []
 
-    visual_parts = []
-
-    for field_id in ("personConcept", "workContext", "action"):
+    for field_id in ("personConcept", "workContext"):
         value = components.get(field_id, "")
 
         if value:
-            visual_parts.append(ensure_sentence(value))
+            subject_parts.append(ensure_sentence(value))
+
+    subjects_text = " ".join(subject_parts) or (
+        "Show one clearly adult fictional person participating in a concrete "
+        "workplace task in a credible, brand-neutral work environment."
+    )
+
+    action_parts = []
+    action = components.get("action", "")
+
+    if action:
+        action_parts.append(ensure_sentence(action))
 
     pose = components.get("pose", "")
 
     if pose:
-        visual_parts.append(
+        action_parts.append(
             ensure_sentence("The main person is " + pose)
         )
 
@@ -904,16 +1049,28 @@ def build_text_to_image_sections(components):
         face_parts.append("is " + gaze)
 
     if face_parts:
-        visual_parts.append(
+        action_parts.append(
             "The main person " + "; ".join(face_parts) + "."
         )
 
     outfit = components.get("outfit", "")
 
     if outfit:
-        visual_parts.append(
+        action_parts.append(
             ensure_sentence("The main person is " + outfit)
         )
+
+    extra_prompt = components.get("extraPrompt", "")
+
+    if extra_prompt:
+        action_parts.append(
+            ensure_sentence("Additional visible detail: " + extra_prompt)
+        )
+
+    action_text = " ".join(action_parts) or (
+        "Use natural task-focused body language, plausible hands, and a gaze "
+        "that connects the main person to the visible work object."
+    )
 
     visual_style_parts = [
         components.get(field_id, "")
@@ -927,35 +1084,26 @@ def build_text_to_image_sections(components):
     ]
 
     if visual_style_parts:
-        visual_parts.append(
-            ensure_sentence(
-                "Use " + ", ".join(visual_style_parts)
-            )
+        composition_text = ensure_sentence(
+            "Use " + ", ".join(visual_style_parts)
         )
-
-    extra_prompt = components.get("extraPrompt", "")
-
-    if extra_prompt:
-        visual_parts.append(
-            ensure_sentence("Additional requested detail: " + extra_prompt)
+    else:
+        composition_text = (
+            "Use an eye-level documentary composition, realistic light, "
+            "natural proportions, and credible workplace detail."
         )
-
-    visual_text = " ".join(visual_parts) or (
-        "Show a credible fictional young adult participating in a concrete "
-        "workplace task with natural body language and realistic work objects."
-    )
 
     constraints_text = (
         "Do not imitate or depict any identifiable real person. Do not present "
         "fictional people as real employees or testimonials. No company logos, "
-        "readable brand names, employee identification cards, exaggerated "
-        "enthusiasm, tokenism, discriminatory content, or stereotypical "
-        "depiction. Every visible person must be a clearly recognizable "
-        "fictional adult aged 18 or older. Do not depict children, minors, "
-        "school pupils, school uniforms, families with children, or people "
-        "whose age appears ambiguous. Show only the people required for the "
-        "selected workplace task and keep the background free of unnecessary "
-        "bystanders. Human review is required before publication."
+        "readable brand names, employee identification cards, generated "
+        "typography, exaggerated enthusiasm, tokenism, discriminatory content, "
+        "or stereotypical depiction. Every visible person must be a clearly "
+        "recognizable fictional adult aged 18 or older. Do not depict children, "
+        "minors, school pupils, school uniforms, families with children, or "
+        "people whose age appears ambiguous. Show only the people required for "
+        "the selected workplace task and keep the background free of "
+        "unnecessary bystanders."
     )
 
     aspect_ratio = components.get("aspectRatio", "16:9") or "16:9"
@@ -977,30 +1125,30 @@ def build_text_to_image_sections(components):
         )
 
     output_text = " ".join(output_parts)
-    success_criteria = build_success_criteria(components)
-    success_text = " ".join(
-        f"{index}. {criterion['prompt']}"
-        for index, criterion in enumerate(success_criteria, start=1)
-    )
 
     section_values = [
-        ("creative_direction", ensure_sentence(creative_direction)),
-        ("task_goal", task_text),
-        ("context", context_text),
-        ("visual_specification", visual_text),
-        ("constraints", constraints_text),
-        ("output_format", output_text),
-        ("success_criteria", success_text)
+        ("visual_direction", ensure_sentence(creative_direction)),
+        ("visible_campaign_intent", visible_intent_text),
+        ("subjects_workplace", subjects_text),
+        ("action_appearance", action_text),
+        ("composition_light", composition_text),
+        ("visual_constraints", constraints_text),
+        ("output", output_text)
     ]
 
     return [
         {
             "id": section_id,
-            "title": TEXT_TO_IMAGE_SECTION_TITLES[section_id],
+            "title": TEXT_TO_IMAGE_RENDER_SECTION_TITLES[section_id],
             "text": text
         }
         for section_id, text in section_values
     ]
+
+
+def build_text_to_image_sections(components):
+    """Backward-compatible alias for the actual render-prompt sections."""
+    return build_text_to_image_render_sections(components)
 
 
 def build_prompt_chain_success_criteria(components):
@@ -1220,14 +1368,6 @@ def build_prompt_chain_sections(components):
             "banner text inside the image."
         )
 
-    success_criteria = build_prompt_chain_success_criteria(components)
-    output_parts.append(
-        "Definition of done: " +
-        " ".join(
-            f"{index}. {criterion['prompt']}"
-            for index, criterion in enumerate(success_criteria, start=1)
-        )
-    )
     output_text = " ".join(output_parts)
 
     section_values = [
@@ -1253,7 +1393,22 @@ def build_prompt_package(components, mode=DEFAULT_MODE):
     normalized_mode = normalize_mode(mode)
 
     if normalized_mode == "text_to_image":
-        sections = build_text_to_image_sections(components)
+        selected_options = get_selected_ui_options(
+            components,
+            "text_to_image"
+        )
+        briefing_sections = build_text_to_image_briefing_sections(
+            components,
+            selected_options
+        )
+        translation_steps = build_text_to_image_translation_steps(
+            components,
+            selected_options
+        )
+        sections = build_text_to_image_render_sections(
+            components,
+            selected_options
+        )
         positive_prompt = "\n\n".join(
             section["title"] + "\n" + section["text"]
             for section in sections
@@ -1261,8 +1416,12 @@ def build_prompt_package(components, mode=DEFAULT_MODE):
 
         return {
             "positive_prompt": positive_prompt.strip(),
+            "render_prompt": positive_prompt.strip(),
             "negative_prompt": TEXT_TO_IMAGE_NEGATIVE_PROMPT,
             "sections": sections,
+            "render_sections": sections,
+            "briefing_sections": briefing_sections,
+            "translation_steps": translation_steps,
             "success_criteria": build_success_criteria(components)
         }
 
@@ -1274,8 +1433,12 @@ def build_prompt_package(components, mode=DEFAULT_MODE):
 
     return {
         "positive_prompt": positive_prompt.strip(),
+        "render_prompt": positive_prompt.strip(),
         "negative_prompt": "",
         "sections": sections,
+        "render_sections": sections,
+        "briefing_sections": [],
+        "translation_steps": [],
         "success_criteria": (
             build_prompt_chain_success_criteria(components)
             if sections else []
@@ -1284,7 +1447,7 @@ def build_prompt_package(components, mode=DEFAULT_MODE):
 
 
 def build_prompt_from_components(components, mode=DEFAULT_MODE):
-    """Backward-compatible accessor for the positive model prompt."""
+    """Backward-compatible accessor for the actual model render prompt."""
     return build_prompt_package(components, mode)["positive_prompt"]
 
 
@@ -2185,8 +2348,12 @@ async def preview_prompt(payload: dict = Body(...)):
             "mode": mode,
             "prompt": prompt_package["positive_prompt"],
             "positive_prompt": prompt_package["positive_prompt"],
+            "render_prompt": prompt_package["render_prompt"],
             "negative_prompt": prompt_package["negative_prompt"],
             "sections": prompt_package["sections"],
+            "render_sections": prompt_package["render_sections"],
+            "briefing_sections": prompt_package["briefing_sections"],
+            "translation_steps": prompt_package["translation_steps"],
             "success_criteria": prompt_package["success_criteria"],
             "components": components
         },
@@ -2375,8 +2542,12 @@ async def run(
             "mode": normalized_mode,
             "prompt_id": prompt_id,
             "submitted_prompt": final_prompt,
+            "submitted_render_prompt": final_prompt,
             "submitted_negative_prompt": negative_prompt,
             "prompt_sections": prompt_package["sections"],
+            "render_sections": prompt_package["render_sections"],
+            "briefing_sections": prompt_package["briefing_sections"],
+            "translation_steps": prompt_package["translation_steps"],
             "success_criteria": prompt_package["success_criteria"],
             "prompt_components": components,
             "results": results,

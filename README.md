@@ -16,34 +16,48 @@ Ergebnisanzeige, optionale Kampagnen-Banner und den Hinweis `KI-generiert`.
 
 ## Prompt Engineering Lab
 
-Der Text-to-Image-Modus übersetzt ein deutschsprachiges Kampagnenbriefing in
-einen englischen, modular aufgebauten Gesamtprompt. Die Struktur ist in der
-Oberfläche und in der Serverantwort sichtbar:
+Der Text-to-Image-Modus trennt drei Ebenen, die in der Oberfläche und in der
+Serverantwort sichtbar bleiben:
 
-1. `CREATIVE ROLE / DIRECTION`
-2. `TASK AND CAMPAIGN GOAL`
-3. `CONTEXT`
-4. `VISUAL SPECIFICATION`
-5. `CONSTRAINTS`
-6. `OUTPUT FORMAT`
-7. `SUCCESS CRITERIA`
+1. **Kampagnenbriefing:** Kampagnenziel, Zielgruppe, Branchenkontext,
+   Arbeitgebernutzen, Wettbewerbsimpuls und Gestaltungsrahmen begründen die
+   Konzeption. Diese Angaben werden nicht wörtlich an das Bildmodell gesendet.
+2. **Visuelle Übersetzung:** Abstrakte Ziele werden in beobachtbare Merkmale
+   übertragen, zum Beispiel „Teamarbeit“ in eine gemeinsame Blickachse auf
+   dieselbe Aufgabe oder „Verantwortung“ in eine aktiv ausgeführte Handlung.
+3. **Render-Prompt:** Nur visuell umsetzbare Angaben zu Person, Arbeitsumgebung,
+   Handlung, Körperhaltung, Blick, Kleidung, Komposition, Licht und Format
+   werden als englischer Prompt an Qwen gesendet.
 
-Die Auswahlfelder decken Kampagnenziel, Zielgruppe, Branchenkontext,
-Arbeitgebernutzen, einen Impuls aus dem Wettbewerbsvergleich sowie die
-beobachtbare Bildgestaltung ab. Reale Unternehmens- und Markennamen werden
-nicht in das Modellprompt übernommen. Verbindliche ethische und markenbezogene
-Leitplanken werden zusätzlich als separater Negative Prompt an den
-Text-to-Image-Workflow übergeben.
+Zielgruppeninformationen wie „Schulabgänger:innen in NRW“, die regionale
+Einordnung sowie das menschliche Prüfraster bleiben außerhalb des
+Render-Prompts. Dadurch wird insbesondere vermieden, dass eine abstrakte
+Zielgruppenbezeichnung unbeabsichtigt sehr jung oder minderjährig wirkende
+Personen auslöst. Das sichtbare Alter wird stattdessen ausdrücklich über die
+Personendarstellung und die Adult-only-Leitplanken gesteuert.
 
-Die Anwendung erzeugt dabei keinen technischen „Multi-Prompt“, sondern einen
-strukturierten positiven Gesamtprompt und einen zugehörigen Negative Prompt.
-Für kontrollierte Vergleiche kann ein fester Seed verwendet werden. Werden
+Der tatsächliche Render-Prompt besteht aus:
+
+1. `VISUAL DIRECTION`
+2. `VISIBLE CAMPAIGN INTENT`
+3. `SUBJECTS AND WORKPLACE`
+4. `ACTION AND APPEARANCE`
+5. `COMPOSITION AND LIGHT`
+6. `VISUAL CONSTRAINTS`
+7. `OUTPUT`
+
+Reale Unternehmens- und Markennamen werden nicht in den Render-Prompt
+übernommen. Verbindliche visuelle Schutzregeln werden zusätzlich als separater
+Negative Prompt an den Text-to-Image-Workflow übergeben. Die automatisch
+abgeleiteten Erfolgskriterien bilden ein getrenntes menschliches Prüfraster;
+sie werden nicht an Qwen gesendet und ersetzen weder Faktencheck noch ethische
+und markenrechtliche Freigabe.
+
+Die Anwendung erzeugt keinen technischen „Multi-Prompt“, sondern einen
+strukturierten Render-Prompt und einen zugehörigen Negative Prompt. Für
+kontrollierte Vergleiche kann ein fester Seed verwendet werden. Werden
 Promptvarianten verglichen, sollten Modell, Seed, Seitenverhältnis, Schritte,
 CFG, Sampler und Scheduler unverändert bleiben.
-
-Die automatisch abgeleiteten Erfolgskriterien dienen als Prüfraster für die
-menschliche Bewertung. Sie sind keine automatische Qualitätsgarantie und
-ersetzen weder den Faktencheck noch die ethische und markenrechtliche Freigabe.
 
 ## Lokale Kampagnenbibliothek und Prompt Chain
 
@@ -75,13 +89,15 @@ verlangt ein primäres Optimierungsziel und gliedert den Prompt in:
 3. `SOURCE AND PRESERVATION`
 4. `REQUESTED VISUAL CHANGES`
 5. `CONSTRAINTS`
-6. `OUTPUT AND DEFINITION OF DONE`
+6. `OUTPUT`
 
 Ausgewählt werden können Änderungsstärke, Erhaltungsfokus, Tätigkeit,
 Personenzahl und Interaktion, Pose, Blick, Gesichtsausdruck, Rollenwirkung,
 Kampagnenkomposition, Bildwirkung sowie eine konkrete Qualitätskorrektur.
 Nicht ausgewählte Merkmale sollen möglichst stabil bleiben. Ein fester Seed
 ermöglicht auch in Stufe 2 besser kontrollierbare Promptvergleiche.
+Die Definition of Done wird als separates menschliches Prüfraster angezeigt
+und nicht in den Optimierungs-Prompt geschrieben.
 
 Die Kampagnenbibliothek liegt ausschließlich unter `webapp/data/` und wird von
 Git ignoriert. Sie wird daher weder committed noch nach GitHub hochgeladen.

@@ -31,6 +31,7 @@
     "id": "campaignGoal",
     "label": "Aufgabe / Kampagnenziel",
     "type": "select",
+    "help": "Bleibt im Kampagnenbriefing und wird vor der Generierung in eine beobachtbare Bildaussage übersetzt.",
     "options": [
       {
         "label": "Bitte auswählen",
@@ -39,19 +40,23 @@
       {
         "label": "Duales Studium sichtbar machen",
         "value": "Create a completely fictional recruiting image for a dual-study campaign.",
+        "visual_translation": "Show a clearly adult early-career learner actively applying guidance in a concrete workplace task.",
         "default": true
       },
       {
         "label": "Berufseinstieg attraktiv erklären",
-        "value": "Create a completely fictional recruiting image for an early-career campaign."
+        "value": "Create a completely fictional recruiting image for an early-career campaign.",
+        "visual_translation": "Show a clearly adult early-career person independently performing a credible entry-level workplace task."
       },
       {
         "label": "Ausbildung in Logistik zeigen",
-        "value": "Create a completely fictional recruiting image for an apprenticeship campaign in retail logistics."
+        "value": "Create a completely fictional recruiting image for an apprenticeship campaign in retail logistics.",
+        "visual_translation": "Show a clearly adult trainee actively completing a concrete logistics process with realistic work objects and adult guidance."
       },
       {
         "label": "Digitalen Fachbereich positionieren",
-        "value": "Create a completely fictional recruiting image for an entry-level digital and administrative career campaign."
+        "value": "Create a completely fictional recruiting image for an entry-level digital and administrative career campaign.",
+        "visual_translation": "Show a clearly adult early-career professional solving a concrete digital or administrative workplace task."
       }
     ]
   },
@@ -59,6 +64,7 @@
     "id": "targetGroup",
     "label": "Zielgruppe",
     "type": "select",
+    "help": "Dient der Kampagnenbegründung und wird nicht wörtlich an die Bild-KI gesendet. Das sichtbare Alter wird unter ‚Fiktive Personendarstellung‘ gesteuert.",
     "options": [
       {
         "label": "Bitte auswählen",
@@ -87,6 +93,7 @@
     "id": "employerContext",
     "label": "Unternehmens- und Branchenkontext",
     "type": "select",
+    "help": "Regionale und strategische Angaben bleiben im Briefing. Die sichtbare Arbeitsumgebung wird separat unter ‚Praxiswelt / Tätigkeit‘ festgelegt.",
     "options": [
       {
         "label": "Bitte auswählen",
@@ -115,6 +122,7 @@
     "id": "employerBenefit",
     "label": "Zentraler Arbeitgebernutzen",
     "type": "select",
+    "help": "Die abstrakte Nutzenbotschaft wird in sichtbare Handlungen, Rollen und Interaktionen übersetzt.",
     "options": [
       {
         "label": "Bitte auswählen",
@@ -123,19 +131,23 @@
       {
         "label": "Praxis, Verantwortung und Teamarbeit",
         "value": "Communicate that practical learning, early responsibility, and teamwork are central employer benefits.",
+        "visual_translation": "Make practical learning, responsibility, and teamwork visible through active hands-on work, shared attention to the same task, and the main person performing rather than merely observing.",
         "default": true
       },
       {
         "label": "Entwicklung und Perspektive",
-        "value": "Communicate structured development, credible learning opportunities, and long-term career perspectives."
+        "value": "Communicate structured development, credible learning opportunities, and long-term career perspectives.",
+        "visual_translation": "Make development visible through a concrete adult learning moment in which the main person applies feedback or completes the next work step."
       },
       {
         "label": "Digitalisierung und Mitgestaltung",
-        "value": "Communicate digital collaboration, problem solving, and the opportunity to contribute ideas early."
+        "value": "Communicate digital collaboration, problem solving, and the opportunity to contribute ideas early.",
+        "visual_translation": "Make participation visible by showing the main person using a digital work tool to solve a shared problem and contribute to the task."
       },
       {
         "label": "Regionalität und Verlässlichkeit",
-        "value": "Communicate regional connection, reliable collaboration, and a structured entry into working life."
+        "value": "Communicate regional connection, reliable collaboration, and a structured entry into working life.",
+        "visual_translation": "Make reliability visible through an orderly everyday workflow, clear role coordination, and a credible locally familiar work environment without regional stereotypes."
       }
     ]
   },
@@ -143,6 +155,7 @@
     "id": "competitorInsight",
     "label": "Erkenntnis aus dem Wettbewerbsvergleich",
     "type": "select",
+    "help": "Der strategische Vergleichsimpuls wird als konkrete Gestaltungsentscheidung in den Render-Prompt übertragen.",
     "options": [
       {
         "label": "Keine Vergleichserkenntnis",
@@ -151,15 +164,18 @@
       {
         "label": "Konkrete Tätigkeit statt gestelltem Porträt",
         "value": "Differentiate the concept from generic posed recruiting portraits by making a concrete workplace activity immediately visible.",
+        "visual_translation": "Prioritize a clearly observable workplace activity and task-focused interaction; avoid a posed recruiting portrait.",
         "default": true
       },
       {
         "label": "Belegbare Szene statt austauschbarer Aussage",
-        "value": "Differentiate the concept from interchangeable employer claims by showing observable workplace behavior and credible work objects."
+        "value": "Differentiate the concept from interchangeable employer claims by showing observable workplace behavior and credible work objects.",
+        "visual_translation": "Support the campaign claim with observable workplace behavior, realistic work objects, and a causally understandable action."
       },
       {
         "label": "Lernweg statt unklarer Karrierebotschaft",
-        "value": "Differentiate the concept by making practical learning and the next development step visually understandable."
+        "value": "Differentiate the concept by making practical learning and the next development step visually understandable.",
+        "visual_translation": "Make the learning path visible through adult guidance, a shared work object, and a clearly understandable next task step."
       }
     ]
   },

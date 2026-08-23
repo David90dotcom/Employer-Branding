@@ -231,21 +231,52 @@
       <div id="frameworkOutput" class="framework-output">
         <div class="framework-output-heading">
           <div>
-            <h3 id="frameworkTitle">Strukturierter Gesamtprompt</h3>
+            <h3 id="frameworkTitle">Vom Briefing zum Render-Prompt</h3>
             <p id="frameworkDescription">
-              Ein positiver Gesamtprompt mit klaren Abschnitten plus separater
-              Negative Prompt – kein Bündel unverbundener Einzelprompts.
+              Strategische Angaben werden zuerst in beobachtbare Bildmerkmale
+              übersetzt. Nur der kompakte Render-Prompt geht an Qwen.
             </p>
           </div>
           <div id="seedSummary" class="seed-summary"></div>
         </div>
 
-        <div id="promptSections" class="prompt-sections"></div>
+        <section id="briefingStage" class="output-stage briefing-stage">
+          <div class="output-stage-heading">
+            <span class="stage-number">1</span>
+            <div>
+              <h4>Kampagnenbriefing</h4>
+              <p>Strategischer Begründungsrahmen · wird nicht wörtlich an die Bild-KI gesendet</p>
+            </div>
+          </div>
+          <div id="briefingSections" class="prompt-sections compact-sections"></div>
+        </section>
+
+        <section id="translationStage" class="output-stage translation-stage">
+          <div class="output-stage-heading">
+            <span class="stage-number">2</span>
+            <div>
+              <h4>Übersetzung in sichtbare Merkmale</h4>
+              <p>Abstrakte Kampagnenziele werden zu beobachtbaren Bildanweisungen</p>
+            </div>
+          </div>
+          <ol id="translationSteps" class="translation-steps"></ol>
+        </section>
+
+        <section id="renderStage" class="output-stage render-stage">
+          <div class="output-stage-heading">
+            <span id="renderStageNumber" class="stage-number">3</span>
+            <div>
+              <h4 id="renderStageTitle">Render-Prompt für Qwen</h4>
+              <p id="renderStageDescription">Ausschließlich visuell umsetzbare Anweisungen · wird an das Bildmodell gesendet</p>
+            </div>
+          </div>
+          <div id="promptSections" class="prompt-sections"></div>
+        </section>
 
         <div class="prompt-output-grid">
           <div class="field">
             <label for="finalPrompt">
-              Positiver Modellprompt
+              Tatsächlich an Qwen gesendeter Render-Prompt
             </label>
 
             <textarea
@@ -267,7 +298,7 @@
         </div>
 
         <div id="successPanel" class="success-panel">
-          <strong>Automatisch abgeleitete Erfolgskriterien</strong>
+          <strong>Menschliches Prüfraster · wird nicht an Qwen gesendet</strong>
           <ul id="successCriteria"></ul>
         </div>
 
@@ -339,6 +370,13 @@
     const negativePromptField = document.getElementById("negativePromptField");
     const frameworkTitle = document.getElementById("frameworkTitle");
     const frameworkDescription = document.getElementById("frameworkDescription");
+    const briefingStage = document.getElementById("briefingStage");
+    const briefingSections = document.getElementById("briefingSections");
+    const translationStage = document.getElementById("translationStage");
+    const translationSteps = document.getElementById("translationSteps");
+    const renderStageNumber = document.getElementById("renderStageNumber");
+    const renderStageTitle = document.getElementById("renderStageTitle");
+    const renderStageDescription = document.getElementById("renderStageDescription");
     const promptSections = document.getElementById("promptSections");
     const successCriteria = document.getElementById("successCriteria");
     const successPanel = document.getElementById("successPanel");
@@ -503,18 +541,26 @@
       promptSections.hidden = false;
       successPanel.hidden = false;
       negativePromptField.hidden = !isTextToImage;
+      briefingStage.hidden = !isTextToImage;
+      translationStage.hidden = !isTextToImage;
 
       if (isTextToImage) {
         modeBadge.textContent = "Strukturierter Zero-shot · Text-to-Image";
         promptLabDescription.textContent = (
-          "Die Auswahlfelder werden serverseitig in sieben nachvollziehbare " +
-          "Promptabschnitte übersetzt. Marken- und Unternehmensnamen werden " +
-          "nicht in das Modellprompt übernommen."
+          "Die Auswahlfelder bilden zuerst das Kampagnenbriefing. Abstrakte " +
+          "Ziele werden anschließend in beobachtbare Bildmerkmale übersetzt; " +
+          "nur der daraus gebildete Render-Prompt geht an Qwen."
         );
-        frameworkTitle.textContent = "Strukturierter Gesamtprompt";
+        frameworkTitle.textContent = "Vom Briefing zum Render-Prompt";
         frameworkDescription.textContent = (
-          "Ein positiver Gesamtprompt mit klaren Abschnitten plus separater " +
-          "Negative Prompt – kein Bündel unverbundener Einzelprompts."
+          "Kampagnenbegründung, Modellanweisung und menschliches Prüfraster " +
+          "bleiben klar voneinander getrennt."
+        );
+        renderStageNumber.textContent = "3";
+        renderStageTitle.textContent = "Render-Prompt für Qwen";
+        renderStageDescription.textContent = (
+          "Ausschließlich visuell umsetzbare Anweisungen · wird an das " +
+          "Bildmodell gesendet"
         );
       } else {
         modeBadge.textContent = "Multimodales Prompt Chaining · Stufe 2";
@@ -525,8 +571,15 @@
         );
         frameworkTitle.textContent = "Strukturierter Optimierungsprompt · Stufe 2";
         frameworkDescription.textContent = (
-          "Root Task, Quellenkontinuität, gewünschte Änderungen, Constraints " +
-          "und Definition of Done bilden einen prüfbaren zweiten Prompt."
+          "Root Task, Quellenkontinuität, gewünschte Änderungen und " +
+          "Constraints bilden den zweiten Render-Prompt. Das Prüfraster " +
+          "bleibt davon getrennt."
+        );
+        renderStageNumber.textContent = "2";
+        renderStageTitle.textContent = "Optimierungs-Prompt für Qwen Edit";
+        renderStageDescription.textContent = (
+          "Gezielte visuelle Änderung des gespeicherten synthetischen " +
+          "Ausgangsbildes"
         );
       }
 
@@ -547,6 +600,8 @@
       gallery.replaceChildren();
       finalPrompt.value = "";
       negativePrompt.value = "";
+      briefingSections.replaceChildren();
+      translationSteps.replaceChildren();
       promptSections.replaceChildren();
       successCriteria.replaceChildren();
       promptDebug.textContent = "";
@@ -617,7 +672,7 @@
         lines.push("");
       }
 
-      lines.push("Server-Prompt:");
+      lines.push("An Qwen gesendeter Render-Prompt:");
       lines.push(prompt || "");
 
       if (negative) {
@@ -792,7 +847,7 @@
 
         const prompt = document.createElement("pre");
         prompt.textContent = [
-          "POSITIVER PROMPT",
+          "RENDER-PROMPT",
           item.positive_prompt || "–",
           "",
           "NEGATIVE PROMPT",
@@ -978,26 +1033,54 @@
 
 
     function renderFrameworkOutput(data) {
+      briefingSections.replaceChildren();
+      translationSteps.replaceChildren();
       promptSections.replaceChildren();
       successCriteria.replaceChildren();
 
-      const sections = Array.isArray(data?.sections)
-        ? data.sections
+      function appendSections(container, sections) {
+        for (const section of sections) {
+          const article = document.createElement("article");
+          article.className = "prompt-section";
+
+          const title = document.createElement("strong");
+          title.textContent = String(section?.title || "Abschnitt");
+
+          const text = document.createElement("p");
+          text.textContent = String(section?.text || "");
+
+          article.append(title, text);
+          container.appendChild(article);
+        }
+      }
+
+      const briefing = Array.isArray(data?.briefing_sections)
+        ? data.briefing_sections
+        : [];
+      appendSections(briefingSections, briefing);
+
+      const translations = Array.isArray(data?.translation_steps)
+        ? data.translation_steps
         : [];
 
-      for (const section of sections) {
-        const article = document.createElement("article");
-        article.className = "prompt-section";
+      for (const step of translations) {
+        const item = document.createElement("li");
+        const source = document.createElement("strong");
+        const instruction = document.createElement("span");
 
-        const title = document.createElement("strong");
-        title.textContent = String(section?.title || "Abschnitt");
+        source.textContent = String(step?.source || "Briefingelement");
+        instruction.textContent = String(step?.instruction || "");
 
-        const text = document.createElement("p");
-        text.textContent = String(section?.text || "");
-
-        article.append(title, text);
-        promptSections.appendChild(article);
+        item.append(source, instruction);
+        translationSteps.appendChild(item);
       }
+
+      const sections = Array.isArray(data?.render_sections)
+        ? data.render_sections
+        : Array.isArray(data?.sections)
+          ? data.sections
+          : [];
+      appendSections(promptSections, sections);
 
       const criteria = Array.isArray(data?.success_criteria)
         ? data.success_criteria
@@ -1598,6 +1681,9 @@
         renderFrameworkOutput({
           components: data?.prompt_components || components,
           sections: data?.prompt_sections || [],
+          render_sections: data?.render_sections || data?.prompt_sections || [],
+          briefing_sections: data?.briefing_sections || [],
+          translation_steps: data?.translation_steps || [],
           success_criteria: data?.success_criteria || []
         });
 
