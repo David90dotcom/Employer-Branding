@@ -770,6 +770,8 @@ def normalize_prompt_components(raw_components, mode=DEFAULT_MODE):
             }
         )
 
+    validate_prompt_component_compatibility(normalized, normalized_mode)
+
     return normalized
 
 
@@ -808,6 +810,68 @@ def get_selected_ui_options(components, mode):
 def selected_option_label(selected_options, field_id):
     option = selected_options.get(field_id, {})
     return str(option.get("label", "") or "").strip()
+
+
+def validate_prompt_component_compatibility(components, mode):
+    """Reject combinations that would create contradictory person prompts."""
+    if mode != "text_to_image":
+        return
+
+    selected_options = get_selected_ui_options(components, mode)
+    configuration = selected_options.get("peopleConfiguration", {})
+    action = selected_options.get("action", {})
+    configuration_id = str(
+        configuration.get("configuration_id", "") or ""
+    ).strip()
+    allowed_configurations = action.get("allowed_configurations")
+
+    if (
+        configuration_id and
+        isinstance(allowed_configurations, list) and
+        configuration_id not in allowed_configurations
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Die gewählte Arbeitsweise passt nicht zur "
+                "Personenkonstellation. Bitte eine der in der Oberfläche "
+                "freigegebenen Tätigkeiten auswählen."
+            )
+        )
+
+    if configuration_id == "solo":
+        components["supportingOutfit"] = ""
+
+
+def build_text_to_image_negative_prompt(
+    components,
+    selected_options=None
+):
+    """Add selection-specific exclusions without contradicting other ages."""
+    selected_options = selected_options or get_selected_ui_options(
+        components,
+        "text_to_image"
+    )
+    additions = []
+
+    for field_id in (
+        "peopleConfiguration",
+        "mainSubjectAge",
+        "backgroundPolicy",
+        "mainOutfit",
+        "supportingOutfit"
+    ):
+        negative_value = str(
+            selected_options.get(field_id, {}).get("negative_prompt", "") or ""
+        ).strip()
+
+        if negative_value:
+            additions.append(negative_value)
+
+    if not additions:
+        return TEXT_TO_IMAGE_NEGATIVE_PROMPT
+
+    return TEXT_TO_IMAGE_NEGATIVE_PROMPT + ", " + ", ".join(additions)
 
 
 def build_text_to_image_briefing_sections(
@@ -915,7 +979,11 @@ def build_text_to_image_translation_steps(
     return steps
 
 
-def build_success_criteria(components):
+def build_success_criteria(components, selected_options=None):
+    selected_options = selected_options or get_selected_ui_options(
+        components,
+        "text_to_image"
+    )
     criteria = [
         {
             "prompt": (
@@ -971,6 +1039,59 @@ def build_success_criteria(components):
         }
     ]
 
+    configuration_label = selected_option_label(
+        selected_options,
+        "peopleConfiguration"
+    )
+    age_label = selected_option_label(
+        selected_options,
+        "mainSubjectAge"
+    )
+    background_label = selected_option_label(
+        selected_options,
+        "backgroundPolicy"
+    )
+
+    if configuration_label or age_label or background_label:
+        selected_labels = " · ".join(
+            label
+            for label in (
+                configuration_label,
+                age_label,
+                background_label
+            )
+            if label
+        )
+        criteria.insert(1, {
+            "prompt": (
+                "The selected foreground configuration, main-subject age "
+                "range, and background-person policy must be followed exactly."
+            ),
+            "label": (
+                "Personenzahl, Alterseindruck und Hintergrund entsprechen "
+                "der Auswahl: " + selected_labels + "."
+            )
+        })
+
+    configuration_id = str(
+        selected_options.get("peopleConfiguration", {}).get(
+            "configuration_id",
+            ""
+        ) or ""
+    )
+
+    if configuration_id and configuration_id != "solo":
+        criteria.insert(2, {
+            "prompt": (
+                "Main and supporting people must remain visually distinct in "
+                "role, position, age impression, and clothing."
+            ),
+            "label": (
+                "Haupt- und Begleitpersonen sind durch Rolle, Position, "
+                "Alterseindruck und Kleidung eindeutig unterscheidbar."
+            )
+        })
+
     if components.get("banner", {}).get("enabled"):
         criteria.append({
             "prompt": (
@@ -1014,7 +1135,20 @@ def build_text_to_image_render_sections(
 
     subject_parts = []
 
-    for field_id in ("personConcept", "workContext"):
+    configuration_option = selected_options.get(
+        "peopleConfiguration",
+        {}
+    )
+    configuration_id = str(
+        configuration_option.get("configuration_id", "") or ""
+    ).strip()
+
+    for field_id in (
+        "peopleConfiguration",
+        "mainSubjectAge",
+        "workContext",
+        "backgroundPolicy"
+    ):
         value = components.get(field_id, "")
 
         if value:
@@ -1053,11 +1187,20 @@ def build_text_to_image_render_sections(
             "The main person " + "; ".join(face_parts) + "."
         )
 
-    outfit = components.get("outfit", "")
+    main_outfit = components.get("mainOutfit", "")
 
-    if outfit:
+    if main_outfit:
         action_parts.append(
-            ensure_sentence("The main person is " + outfit)
+            ensure_sentence(main_outfit)
+        )
+
+    supporting_outfit = components.get("supportingOutfit", "")
+
+    if supporting_outfit and configuration_id != "solo":
+        action_parts.append(ensure_sentence(supporting_outfit))
+        action_parts.append(
+            "Keep the clothing colors and garment types of the main and "
+            "supporting people visibly distinct."
         )
 
     extra_prompt = components.get("extraPrompt", "")
@@ -1101,9 +1244,10 @@ def build_text_to_image_render_sections(
         "or stereotypical depiction. Every visible person must be a clearly "
         "recognizable fictional adult aged 18 or older. Do not depict children, "
         "minors, school pupils, school uniforms, families with children, or "
-        "people whose age appears ambiguous. Show only the people required for "
-        "the selected workplace task and keep the background free of "
-        "unnecessary bystanders."
+        "people whose age appears ambiguous. Follow the selected foreground "
+        "configuration and background-person policy exactly. Do not merge, "
+        "duplicate, or interchange the roles, ages, positions, or clothing of "
+        "the main and supporting people."
     )
 
     aspect_ratio = components.get("aspectRatio", "16:9") or "16:9"
@@ -1417,12 +1561,18 @@ def build_prompt_package(components, mode=DEFAULT_MODE):
         return {
             "positive_prompt": positive_prompt.strip(),
             "render_prompt": positive_prompt.strip(),
-            "negative_prompt": TEXT_TO_IMAGE_NEGATIVE_PROMPT,
+            "negative_prompt": build_text_to_image_negative_prompt(
+                components,
+                selected_options
+            ),
             "sections": sections,
             "render_sections": sections,
             "briefing_sections": briefing_sections,
             "translation_steps": translation_steps,
-            "success_criteria": build_success_criteria(components)
+            "success_criteria": build_success_criteria(
+                components,
+                selected_options
+            )
         }
 
     sections = build_prompt_chain_sections(components)

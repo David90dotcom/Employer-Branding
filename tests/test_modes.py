@@ -166,11 +166,157 @@ class GenerationModeTests(unittest.TestCase):
         )
 
         render_prompt = package["render_prompt"]
-        self.assertIn("actively applying guidance", render_prompt)
+        self.assertIn("performed under adult guidance", render_prompt)
         self.assertIn("shared attention to the same task", render_prompt)
         self.assertIn("avoid a posed recruiting portrait", render_prompt)
         self.assertNotIn("Human review is required", render_prompt)
         self.assertNotIn("Kampagnenziel", render_prompt)
+
+    def test_subject_controls_have_separate_non_overlapping_responsibilities(self):
+        fields = module.load_ui_fields("text_to_image")
+        field_ids = {field["id"] for field in fields}
+
+        self.assertTrue({
+            "peopleConfiguration",
+            "mainSubjectAge",
+            "backgroundPolicy",
+            "mainOutfit",
+            "supportingOutfit"
+        }.issubset(field_ids))
+        self.assertNotIn("personConcept", field_ids)
+        self.assertNotIn("outfit", field_ids)
+
+    def test_default_subject_prompt_distinguishes_age_roles_and_clothing(self):
+        raw = default_components_for_mode("text_to_image")
+        components = module.normalize_prompt_components(
+            raw,
+            "text_to_image"
+        )
+        package = module.build_prompt_package(
+            components,
+            "text_to_image"
+        )
+
+        prompt = package["render_prompt"]
+        negative_prompt = package["negative_prompt"]
+
+        self.assertIn("exactly two", prompt)
+        self.assertIn("one mentor aged approximately 35 to 50", prompt)
+        self.assertIn("aged approximately 20 to 24", prompt)
+        self.assertIn("light-blue overshirt", prompt)
+        self.assertIn("No additional people are visible", prompt)
+        self.assertIn("clothing colors and garment types", prompt)
+        self.assertIn("middle-aged main subject", negative_prompt)
+        self.assertIn("matching green shirts", negative_prompt)
+
+    def test_incompatible_people_and_action_combination_is_rejected(self):
+        fields = module.load_ui_fields("text_to_image")
+        raw = default_components_for_mode("text_to_image")
+        people_field = next(
+            field
+            for field in fields
+            if field["id"] == "peopleConfiguration"
+        )
+        solo_option = next(
+            option
+            for option in people_field["options"]
+            if option.get("configuration_id") == "solo"
+        )
+        raw["peopleConfiguration"] = solo_option["value"]
+
+        with self.assertRaises(HTTPException) as raised:
+            module.normalize_prompt_components(raw, "text_to_image")
+
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn(
+            "passt nicht zur Personenkonstellation",
+            raised.exception.detail
+        )
+
+    def test_every_people_configuration_has_a_compatible_recommendation(self):
+        fields = module.load_ui_fields("text_to_image")
+        people_field = next(
+            field
+            for field in fields
+            if field["id"] == "peopleConfiguration"
+        )
+        action_field = next(
+            field
+            for field in fields
+            if field["id"] == "action"
+        )
+
+        for configuration in people_field["options"]:
+            configuration_id = configuration.get("configuration_id")
+
+            if not configuration_id:
+                continue
+
+            recommended = next(
+                (
+                    option
+                    for option in action_field["options"]
+                    if configuration_id in option.get("recommended_for", [])
+                ),
+                None
+            )
+            self.assertIsNotNone(recommended, configuration_id)
+            self.assertIn(
+                configuration_id,
+                recommended["allowed_configurations"]
+            )
+
+            raw = default_components_for_mode("text_to_image")
+            raw["peopleConfiguration"] = configuration["value"]
+            raw["action"] = recommended["value"]
+            components = module.normalize_prompt_components(
+                raw,
+                "text_to_image"
+            )
+            package = module.build_prompt_package(
+                components,
+                "text_to_image"
+            )
+            self.assertIn(configuration["value"], package["render_prompt"])
+
+    def test_solo_configuration_omits_supporting_outfit(self):
+        fields = module.load_ui_fields("text_to_image")
+        raw = default_components_for_mode("text_to_image")
+        people_field = next(
+            field
+            for field in fields
+            if field["id"] == "peopleConfiguration"
+        )
+        action_field = next(
+            field
+            for field in fields
+            if field["id"] == "action"
+        )
+        raw["peopleConfiguration"] = next(
+            option["value"]
+            for option in people_field["options"]
+            if option.get("configuration_id") == "solo"
+        )
+        raw["action"] = next(
+            option["value"]
+            for option in action_field["options"]
+            if "solo" in option.get("recommended_for", [])
+        )
+
+        components = module.normalize_prompt_components(
+            raw,
+            "text_to_image"
+        )
+        package = module.build_prompt_package(
+            components,
+            "text_to_image"
+        )
+
+        self.assertEqual(components["supportingOutfit"], "")
+        self.assertNotIn(
+            "Every supporting person wears",
+            package["render_prompt"]
+        )
 
     def test_prompt_chain_uses_a_saved_synthetic_source(self):
         self.assertTrue(

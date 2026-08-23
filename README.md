@@ -53,6 +53,31 @@ abgeleiteten Erfolgskriterien bilden ein getrenntes menschliches Prüfraster;
 sie werden nicht an Qwen gesendet und ersetzen weder Faktencheck noch ethische
 und markenrechtliche Freigabe.
 
+### Widerspruchsfreie Personen- und Kleidungssteuerung
+
+Personenzahl, Rollenverteilung und Bildhierarchie werden gemeinsam über die
+`Personenkonstellation` festgelegt. Davon getrennt steuern eigene Felder:
+
+- den Alterseindruck ausschließlich der Hauptperson,
+- zusätzliche Personen ausschließlich im Hintergrund,
+- die Kleidung und Farbpalette der Hauptperson,
+- eine sichtbar abweichende Kleidung der Begleitpersonen.
+
+Die Konstellationen unterscheiden zwischen einzelner Hauptperson,
+Hauptperson mit erwachsener Mentorin beziehungsweise erwachsenem Mentor,
+gleichrangigem Zweierteam und dreiköpfigem Erwachsenenteam. Tätigkeiten tragen
+Kompatibilitätsangaben: Bei einer einzelnen Hauptperson kann beispielsweise
+keine „praktische Anleitung“ ausgewählt werden, die zwei Personen voraussetzt.
+Die Oberfläche deaktiviert unpassende Tätigkeiten und wählt bei einem Wechsel
+eine geeignete Alternative; dieselbe Regel wird zusätzlich serverseitig
+geprüft. Bei einer Einzelperson wird das Feld für Begleitkleidung ausgeblendet
+und nicht in den Render-Prompt übernommen.
+
+Alters- und Kleidungsoptionen ergänzen passende dynamische Ausschlüsse im
+Negative Prompt. Dadurch kann ein gewünschter junger, aber eindeutig
+volljähriger Alterseindruck gestärkt werden, ohne eine später bewusst gewählte
+ältere Hauptperson durch einen statischen Negative Prompt auszuschließen.
+
 Die Anwendung erzeugt keinen technischen „Multi-Prompt“, sondern einen
 strukturierten Render-Prompt und einen zugehörigen Negative Prompt. Für
 kontrollierte Vergleiche kann ein fester Seed verwendet werden. Werden

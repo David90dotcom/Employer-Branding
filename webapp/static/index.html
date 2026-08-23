@@ -1194,6 +1194,73 @@
     }
 
 
+    function updateTextToImageCompatibility() {
+      if (currentMode !== "text_to_image") {
+        return;
+      }
+
+      const configurationSelect = document.getElementById(
+        "peopleConfiguration"
+      );
+      const actionSelect = document.getElementById("action");
+
+      if (!configurationSelect || !actionSelect) {
+        return;
+      }
+
+      const selectedConfiguration = configurationSelect.selectedOptions[0];
+      const configurationId = String(
+        selectedConfiguration?.dataset?.configurationId || ""
+      );
+
+      for (const option of actionSelect.options) {
+        const rawAllowed = option.dataset.allowedConfigurations;
+
+        if (!rawAllowed || !configurationId) {
+          option.disabled = false;
+          continue;
+        }
+
+        const allowed = rawAllowed.split(",").filter(Boolean);
+        option.disabled = !allowed.includes(configurationId);
+      }
+
+      if (actionSelect.selectedOptions[0]?.disabled) {
+        const recommended = Array.from(actionSelect.options).find(option => {
+          const rawRecommended = option.dataset.recommendedFor || "";
+          return (
+            !option.disabled &&
+            rawRecommended.split(",").includes(configurationId)
+          );
+        });
+        const firstAllowed = Array.from(actionSelect.options).find(
+          option => !option.disabled && option.value
+        );
+        const replacement = recommended || firstAllowed;
+
+        if (replacement) {
+          actionSelect.value = replacement.value;
+        }
+      }
+
+      const supportingOutfitWrapper = fieldsGrid.querySelector(
+        '[data-field-id="supportingOutfit"]'
+      );
+      const supportingOutfitSelect = document.getElementById(
+        "supportingOutfit"
+      );
+      const solo = configurationId === "solo";
+
+      if (supportingOutfitWrapper) {
+        supportingOutfitWrapper.hidden = solo;
+      }
+
+      if (supportingOutfitSelect) {
+        supportingOutfitSelect.disabled = solo;
+      }
+    }
+
+
     // ------------------------------------------------------------
     // UI-Felder laden
     // ------------------------------------------------------------
@@ -1358,6 +1425,7 @@
 
           const wrapper = document.createElement("div");
           wrapper.className = "field";
+          wrapper.dataset.fieldId = field.id;
 
           const label = document.createElement("label");
           label.htmlFor = field.id;
@@ -1377,13 +1445,31 @@
             option.textContent = String(optionData.label ?? "");
             option.selected = Boolean(optionData.default);
 
+            if (optionData.configuration_id !== undefined) {
+              option.dataset.configurationId = String(
+                optionData.configuration_id || ""
+              );
+            }
+
+            if (Array.isArray(optionData.allowed_configurations)) {
+              option.dataset.allowedConfigurations = (
+                optionData.allowed_configurations.join(",")
+              );
+            }
+
+            if (Array.isArray(optionData.recommended_for)) {
+              option.dataset.recommendedFor = (
+                optionData.recommended_for.join(",")
+              );
+            }
+
             select.appendChild(option);
           }
 
-          select.addEventListener(
-            "change",
-            schedulePromptPreview
-          );
+          select.addEventListener("change", () => {
+            updateTextToImageCompatibility();
+            schedulePromptPreview();
+          });
 
           select.addEventListener(
             "input",
@@ -1404,6 +1490,8 @@
             sectionForField(field.id)
           ).appendChild(wrapper);
         }
+
+        updateTextToImageCompatibility();
 
         console.log(
           "Geladene UI-Felder:",

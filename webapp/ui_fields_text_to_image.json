@@ -40,23 +40,23 @@
       {
         "label": "Duales Studium sichtbar machen",
         "value": "Create a completely fictional recruiting image for a dual-study campaign.",
-        "visual_translation": "Show a clearly adult early-career learner actively applying guidance in a concrete workplace task.",
+        "visual_translation": "Make the dual-study context visible through a concrete workplace task performed under adult guidance.",
         "default": true
       },
       {
         "label": "Berufseinstieg attraktiv erklären",
         "value": "Create a completely fictional recruiting image for an early-career campaign.",
-        "visual_translation": "Show a clearly adult early-career person independently performing a credible entry-level workplace task."
+        "visual_translation": "Make the career entry visible by showing the main subject independently performing a credible entry-level workplace task."
       },
       {
         "label": "Ausbildung in Logistik zeigen",
         "value": "Create a completely fictional recruiting image for an apprenticeship campaign in retail logistics.",
-        "visual_translation": "Show a clearly adult trainee actively completing a concrete logistics process with realistic work objects and adult guidance."
+        "visual_translation": "Make workplace learning visible by showing the main subject actively completing a concrete logistics process with realistic work objects and guidance."
       },
       {
         "label": "Digitalen Fachbereich positionieren",
         "value": "Create a completely fictional recruiting image for an entry-level digital and administrative career campaign.",
-        "visual_translation": "Show a clearly adult early-career professional solving a concrete digital or administrative workplace task."
+        "visual_translation": "Make digital participation visible by showing the main subject solving a concrete digital or administrative workplace task."
       }
     ]
   },
@@ -64,7 +64,7 @@
     "id": "targetGroup",
     "label": "Zielgruppe",
     "type": "select",
-    "help": "Dient der Kampagnenbegründung und wird nicht wörtlich an die Bild-KI gesendet. Das sichtbare Alter wird unter ‚Fiktive Personendarstellung‘ gesteuert.",
+    "help": "Dient der Kampagnenbegründung und wird nicht wörtlich an die Bild-KI gesendet. Das sichtbare Alter wird ausschließlich über ‚Alterseindruck der Hauptperson‘ gesteuert.",
     "options": [
       {
         "label": "Bitte auswählen",
@@ -190,7 +190,7 @@
       },
       {
         "label": "Filiale / Lebensmitteleinzelhandel",
-        "value": "A realistic modern food-retail store during normal operations. The main person coordinates a clearly visible task involving shelves, products, a tablet, or a short team briefing. The store is organized, credible, and free of readable brand names or company logos.",
+        "value": "A realistic modern food-retail store during normal operations. The main person performs a clearly visible task involving shelves, products, or a tablet. The store is organized, credible, and free of readable brand names or company logos.",
         "default": true
       },
       {
@@ -212,30 +212,100 @@
     ]
   },
   {
-    "id": "personConcept",
-    "label": "Fiktive Personendarstellung",
+    "id": "peopleConfiguration",
+    "label": "Personenkonstellation",
     "type": "select",
+    "help": "Legt Anzahl, Rollenverteilung und Bildhierarchie gemeinsam fest. Dadurch entstehen keine widersprüchlichen Einzelangaben zur Personenzahl.",
+    "options": [
+      {
+        "label": "Bitte auswählen",
+        "value": "",
+        "configuration_id": "",
+        "foreground_count": 0
+      },
+      {
+        "label": "Eine Hauptperson",
+        "value": "Show exactly one clearly adult fictional foreground participant as the clear main subject.",
+        "configuration_id": "solo",
+        "foreground_count": 1,
+        "negative_prompt": "second foreground participant, additional foreground person"
+      },
+      {
+        "label": "Hauptperson + Mentor:in",
+        "value": "Show exactly two clearly adult fictional foreground participants: one clear main subject and one mentor aged approximately 35 to 50. The main subject occupies the primary visual position and actively performs the task. The mentor is secondary, positioned slightly behind or beside the main subject, and provides guidance.",
+        "configuration_id": "mentor_pair",
+        "foreground_count": 2,
+        "negative_prompt": "third foreground participant, extra foreground person",
+        "default": true
+      },
+      {
+        "label": "Hauptperson + gleichrangige Person",
+        "value": "Show exactly two clearly adult fictional foreground participants: one clear main subject and one adult peer. The main subject remains visually primary while both contribute credibly to the same task.",
+        "configuration_id": "peer_pair",
+        "foreground_count": 2,
+        "negative_prompt": "third foreground participant, extra foreground person"
+      },
+      {
+        "label": "Dreiköpfiges Erwachsenenteam",
+        "value": "Show exactly three clearly adult fictional foreground participants: one clear main subject and two adult colleagues with distinct functional roles in the same task. The main subject remains visually primary; no person functions as decoration.",
+        "configuration_id": "small_team",
+        "foreground_count": 3,
+        "negative_prompt": "fourth foreground participant, extra foreground person"
+      }
+    ]
+  },
+  {
+    "id": "mainSubjectAge",
+    "label": "Alterseindruck der Hauptperson",
+    "type": "select",
+    "help": "Steuert ausschließlich den sichtbaren Alterseindruck der Hauptperson; Zielgruppenangaben verändern diesen Wert nicht.",
     "options": [
       {
         "label": "Bitte auswählen",
         "value": ""
       },
       {
-        "label": "Eine junge erwachsene Person",
-        "value": "One clearly adult fictional person between approximately 20 and 25 is the clear main subject. The person looks natural, credible, and appropriate for an early-career employer-branding campaign."
-      },
-      {
-        "label": "Eine Person im dualen Studium",
-        "value": "One clearly adult fictional person between approximately 20 and 25 in a dual-study context is the clear main subject. The portrayal communicates curiosity, growing responsibility, and practical learning without presenting the person as a real employee.",
+        "label": "20–24 Jahre · Duales Studium",
+        "value": "The main subject has the unmistakably adult appearance of a person aged approximately 20 to 24, with youthful adult facial proportions and no childlike features.",
+        "negative_prompt": "middle-aged main subject, mature-looking main subject, main subject older than 29, underage main subject, childlike main subject",
         "default": true
       },
       {
-        "label": "Zwei gleichwertige Personen",
-        "value": "Two clearly adult fictional people aged 18 or older are shown with equal visual importance while working on the same credible task. Neither person is treated as a token or decorative background figure."
+        "label": "25–29 Jahre · Berufseinstieg",
+        "value": "The main subject has the clearly adult appearance of a person aged approximately 25 to 29.",
+        "negative_prompt": "middle-aged main subject, main subject older than 39, underage main subject, childlike main subject"
       },
       {
-        "label": "Kleines vielfältiges Team",
-        "value": "A small fictional team of three clearly adult people aged 18 or older with naturally varied appearances collaborates as equals. Diversity is shown without stereotypes, exaggerated symbolism, or tokenism."
+        "label": "30–39 Jahre · Berufserfahrung",
+        "value": "The main subject has the clearly adult appearance of a person aged approximately 30 to 39.",
+        "negative_prompt": "teenage main subject, underage main subject, elderly main subject"
+      },
+      {
+        "label": "40–55 Jahre · Erfahrene Fachkraft",
+        "value": "The main subject has the clearly adult appearance of a person aged approximately 40 to 55.",
+        "negative_prompt": "teenage main subject, underage main subject, very young main subject"
+      }
+    ]
+  },
+  {
+    "id": "backgroundPolicy",
+    "label": "Hintergrundpersonen",
+    "type": "select",
+    "help": "Die Vordergrundkonstellation bleibt unverändert; dieses Feld regelt ausschließlich zusätzliche Personen im Hintergrund.",
+    "options": [
+      {
+        "label": "Keine Hintergrundpersonen",
+        "value": "No additional people are visible in the background; the selected foreground participants are the only people in the entire image.",
+        "negative_prompt": "background person, background customer, background worker, crowd, bystander",
+        "default": true
+      },
+      {
+        "label": "Höchstens zwei erwachsene Mitarbeitende",
+        "value": "At most one or two clearly adult fictional staff members may appear unobtrusively in the distant background. They must look unmistakably adult and perform a plausible work task without competing with the main subject."
+      },
+      {
+        "label": "Höchstens zwei erwachsene Kund:innen",
+        "value": "At most one or two clearly adult fictional customers may appear unobtrusively in the distant background. They must look unmistakably adult and must not compete with the main subject."
       }
     ]
   },
@@ -243,6 +313,7 @@
     "id": "action",
     "label": "Arbeitsweise / Zusammenarbeit",
     "type": "select",
+    "help": "Die Oberfläche bietet nur Tätigkeiten an, die zur gewählten Personenkonstellation passen.",
     "options": [
       {
         "label": "Keine Vorgabe",
@@ -250,24 +321,33 @@
       },
       {
         "label": "Konzentriert an einer Aufgabe",
-        "value": "The main person is focused on one clearly visible and plausible task. Hands, gaze, and relevant work objects align naturally with the activity."
+        "value": "The main person is focused on one clearly visible and plausible task. Hands, gaze, and relevant work objects align naturally with the activity.",
+        "allowed_configurations": ["solo", "mentor_pair", "peer_pair", "small_team"],
+        "recommended_for": ["solo"]
       },
       {
         "label": "Austausch mit einer Person",
-        "value": "The main person exchanges information with one clearly adult fictional colleague while both focus on the same document, screen, product, tool, or work object."
+        "value": "The main person exchanges information with one clearly adult fictional colleague while both focus on the same document, screen, product, tool, or work object.",
+        "allowed_configurations": ["mentor_pair", "peer_pair", "small_team"],
+        "recommended_for": ["peer_pair"]
       },
       {
         "label": "Praktische Anleitung",
-        "value": "A concrete learning moment is visible between two clearly adult fictional people: one adult colleague explains a work step while the other follows the same object, process, or document.",
+        "value": "A concrete learning moment is visible: the main subject actively performs a work step while the adult mentor provides guidance. Both focus on the same object, process, or document.",
+        "allowed_configurations": ["mentor_pair", "small_team"],
+        "recommended_for": ["mentor_pair"],
         "default": true
       },
       {
         "label": "Team bespricht eine Aufgabe",
-        "value": "A small team of clearly adult fictional colleagues briefly discusses a concrete task around a shared table, screen, plan, product display, or work area."
+        "value": "The three-person adult team briefly discusses one concrete task around a shared table, screen, plan, product display, or work area. Every person has a clear functional connection to the task.",
+        "allowed_configurations": ["small_team"],
+        "recommended_for": ["small_team"]
       },
       {
         "label": "Ergebnis prüfen oder übergeben",
-        "value": "The main person checks or hands over a visible work result, document, product arrangement, package, plan, or project result."
+        "value": "The main person checks or hands over a visible work result, document, product arrangement, package, plan, or project result while all other participants remain connected to the same task.",
+        "allowed_configurations": ["mentor_pair", "peer_pair", "small_team"]
       }
     ]
   },
@@ -304,30 +384,63 @@
     ]
   },
   {
-    "id": "outfit",
-    "label": "Kleidung / Rollenwirkung",
+    "id": "mainOutfit",
+    "label": "Kleidung der Hauptperson",
     "type": "select",
+    "help": "Kleidungsart und Farbpalette werden gemeinsam festgelegt, damit keine zufällige Einheitskleidung entsteht.",
     "options": [
       {
         "label": "Keine Vorgabe",
         "value": ""
       },
       {
-        "label": "Schlicht professionell",
-        "value": "wearing simple, well-fitted professional clothing without visible logos, slogans, name tags, or recognizable brand colors"
-      },
-      {
-        "label": "Business casual",
-        "value": "wearing a plain shirt or blouse with neat trousers and practical, understated shoes"
-      },
-      {
-        "label": "Moderner Arbeitslook",
-        "value": "wearing a clean overshirt, plain shirt, dark trousers, and practical shoes suitable for the visible workplace",
+        "label": "Hellblaues Overshirt · Weiß · Dunkelblau",
+        "value": "The main subject wears a light-blue overshirt over a plain white top, dark navy trousers, and practical understated shoes. The clothing contains no logo, slogan, name tag, or green garment.",
+        "negative_prompt": "green shirt on main subject, green overshirt on main subject",
         "default": true
       },
       {
-        "label": "Tech-casual",
-        "value": "wearing a plain sweater, shirt, or casual jacket with neat trousers and no visible logos"
+        "label": "Dunkelblaue Jacke · Hellgrau · Anthrazit",
+        "value": "The main subject wears a plain dark-navy work jacket over a light-grey top, charcoal trousers, and practical understated shoes. The clothing contains no logo, slogan, name tag, or green garment.",
+        "negative_prompt": "green shirt on main subject, green jacket on main subject"
+      },
+      {
+        "label": "Sandfarbenes Overshirt · Weiß · Schwarz",
+        "value": "The main subject wears a plain sand-colored overshirt over a white top, black trousers, and practical understated shoes. The clothing contains no logo, slogan, name tag, or green garment.",
+        "negative_prompt": "green shirt on main subject, green overshirt on main subject"
+      },
+      {
+        "label": "Business Casual · Blau · Grau",
+        "value": "The main subject wears a plain light-blue shirt or blouse with well-fitted grey trousers and practical understated shoes. The clothing contains no logo, slogan, name tag, or green garment.",
+        "negative_prompt": "green shirt on main subject, green blouse on main subject"
+      }
+    ]
+  },
+  {
+    "id": "supportingOutfit",
+    "label": "Kleidung der Begleitpersonen",
+    "type": "select",
+    "help": "Wird bei einer einzelnen Hauptperson automatisch ausgeblendet. Begleitpersonen erhalten sichtbar andere Farben und Kleidungsformen.",
+    "options": [
+      {
+        "label": "Keine Vorgabe",
+        "value": ""
+      },
+      {
+        "label": "Helle neutrale Kontrastkleidung",
+        "value": "Every supporting person wears an individually distinct outfit using light grey, beige, and charcoal garments. Garment combinations differ clearly from the main subject and from one another. No matching uniform, identical shirt, or green garment is used.",
+        "negative_prompt": "matching outfits, identical shirts, matching green shirts, green shirt on supporting person",
+        "default": true
+      },
+      {
+        "label": "Dunkelblau-graue Kontrastkleidung",
+        "value": "Every supporting person wears an individually distinct outfit using dark navy, light grey, and charcoal garments. Garment combinations differ clearly from the main subject and from one another. No matching uniform, identical shirt, or green garment is used.",
+        "negative_prompt": "matching outfits, identical shirts, matching green shirts, green shirt on supporting person"
+      },
+      {
+        "label": "Sandfarben-graue Kontrastkleidung",
+        "value": "Every supporting person wears an individually distinct outfit using sand, light grey, and charcoal garments. Garment combinations differ clearly from the main subject and from one another. No matching uniform, identical shirt, or green garment is used.",
+        "negative_prompt": "matching outfits, identical shirts, matching green shirts, green shirt on supporting person"
       }
     ]
   },
