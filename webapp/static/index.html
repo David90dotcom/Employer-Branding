@@ -364,6 +364,13 @@
                   maxlength="240"
                   aria-label="Subheadline direkt in der Vorschau bearbeiten"
                 ></textarea>
+                <div
+                  id="bannerTextResizeHandle"
+                  class="banner-text-resize-handle"
+                  role="button"
+                  aria-label="Textfeldgröße ändern"
+                  title="Textfeldgröße ändern"
+                ></div>
               </div>
             </div>
             <span class="field-help">
@@ -663,6 +670,7 @@
     const bannerPlacementPreview = document.getElementById("bannerPlacementPreview");
     const bannerTextBoxPreview = document.getElementById("bannerTextBoxPreview");
     const bannerTextDragHandle = document.getElementById("bannerTextDragHandle");
+    const bannerTextResizeHandle = document.getElementById("bannerTextResizeHandle");
     const bannerHeadlinePreviewEditor = document.getElementById("bannerHeadlinePreviewEditor");
     const bannerSubtextPreviewEditor = document.getElementById("bannerSubtextPreviewEditor");
 
@@ -690,7 +698,6 @@
     let selectedLibrarySource = null;
     let libraryItems = [];
     let logoPreviewUrl = null;
-    let updatingFreeTextGeometry = false;
 
 
     // ------------------------------------------------------------
@@ -1518,7 +1525,6 @@
       bannerFontSize.value = String(geometry.fontSize);
       updateFreeTextOutputs(geometry);
 
-      updatingFreeTextGeometry = true;
       bannerTextBoxPreview.style.left = `${geometry.x}%`;
       bannerTextBoxPreview.style.top = `${geometry.y}%`;
       bannerTextBoxPreview.style.width = `${geometry.width}%`;
@@ -1556,59 +1562,6 @@
         bannerSubtextPreviewEditor.value = bannerSubtext.value;
       }
 
-      requestAnimationFrame(() => {
-        updatingFreeTextGeometry = false;
-      });
-    }
-
-
-    function syncFreeTextGeometryFromPreview() {
-      if (
-        updatingFreeTextGeometry ||
-        bannerFreePositioningSettings.hidden
-      ) {
-        return;
-      }
-
-      const previewRect = bannerPlacementPreview.getBoundingClientRect();
-      const boxRect = bannerTextBoxPreview.getBoundingClientRect();
-
-      if (!previewRect.width || !previewRect.height) {
-        return;
-      }
-
-      const width = clampNumber(
-        boxRect.width / previewRect.width * 100,
-        10,
-        100,
-        40
-      );
-      const height = clampNumber(
-        boxRect.height / previewRect.height * 100,
-        10,
-        100,
-        44
-      );
-      const x = clampNumber(
-        (boxRect.left - previewRect.left) / previewRect.width * 100,
-        0,
-        100 - width,
-        56
-      );
-      const y = clampNumber(
-        (boxRect.top - previewRect.top) / previewRect.height * 100,
-        0,
-        100 - height,
-        28
-      );
-
-      bannerBoxX.value = String(Math.round(x * 10) / 10);
-      bannerBoxY.value = String(Math.round(y * 10) / 10);
-      bannerBoxWidth.value = String(Math.round(width * 10) / 10);
-      bannerBoxHeight.value = String(Math.round(height * 10) / 10);
-      updateFreeTextOutputs(collectFreeTextGeometry());
-      applyFreeTextPreviewStyle();
-      schedulePromptPreview();
     }
 
 
@@ -1662,12 +1615,6 @@
     }
 
 
-    const freeTextResizeObserver = new ResizeObserver(
-      syncFreeTextGeometryFromPreview
-    );
-    freeTextResizeObserver.observe(bannerTextBoxPreview);
-
-
     bannerTextDragHandle.addEventListener("pointerdown", event => {
       if (!bannerFreePositioning.checked) {
         return;
@@ -1718,6 +1665,76 @@
       bannerTextDragHandle.addEventListener("pointermove", moveTextBox);
       bannerTextDragHandle.addEventListener("pointerup", finishDrag);
       bannerTextDragHandle.addEventListener("pointercancel", finishDrag);
+    });
+
+
+    bannerTextResizeHandle.addEventListener("pointerdown", event => {
+      if (!bannerFreePositioning.checked) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      bannerTextResizeHandle.setPointerCapture(event.pointerId);
+
+      const startGeometry = collectFreeTextGeometry();
+      const previewRect = bannerPlacementPreview.getBoundingClientRect();
+      const startX = event.clientX;
+      const startY = event.clientY;
+
+      function resizeTextBox(moveEvent) {
+        if (!previewRect.width || !previewRect.height) {
+          return;
+        }
+
+        const deltaWidth = (
+          (moveEvent.clientX - startX) / previewRect.width * 100
+        );
+        const deltaHeight = (
+          (moveEvent.clientY - startY) / previewRect.height * 100
+        );
+        const width = clampNumber(
+          startGeometry.width + deltaWidth,
+          10,
+          100,
+          startGeometry.width
+        );
+        const height = clampNumber(
+          startGeometry.height + deltaHeight,
+          10,
+          100,
+          startGeometry.height
+        );
+
+        bannerBoxWidth.value = String(Math.round(width * 10) / 10);
+        bannerBoxHeight.value = String(Math.round(height * 10) / 10);
+        applyFreeTextPreviewStyle();
+      }
+
+      function finishResize(finishEvent) {
+        bannerTextResizeHandle.removeEventListener(
+          "pointermove",
+          resizeTextBox
+        );
+        bannerTextResizeHandle.removeEventListener(
+          "pointerup",
+          finishResize
+        );
+        bannerTextResizeHandle.removeEventListener(
+          "pointercancel",
+          finishResize
+        );
+
+        if (bannerTextResizeHandle.hasPointerCapture(finishEvent.pointerId)) {
+          bannerTextResizeHandle.releasePointerCapture(finishEvent.pointerId);
+        }
+
+        schedulePromptPreview();
+      }
+
+      bannerTextResizeHandle.addEventListener("pointermove", resizeTextBox);
+      bannerTextResizeHandle.addEventListener("pointerup", finishResize);
+      bannerTextResizeHandle.addEventListener("pointercancel", finishResize);
     });
 
 

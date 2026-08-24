@@ -1041,9 +1041,14 @@ class GenerationModeTests(unittest.TestCase):
         self.assertIn('id="bannerFontScale"', html)
         self.assertIn('id="bannerFreePositioning"', html)
         self.assertIn('id="bannerTextBoxPreview"', html)
+        self.assertIn('id="bannerTextResizeHandle"', html)
         self.assertIn('id="bannerFontSize"', html)
-        self.assertIn("ResizeObserver", html)
+        self.assertNotIn("ResizeObserver", html)
         self.assertIn('addEventListener("pointerdown"', html)
+        self.assertIn(
+            'bannerTextResizeHandle.addEventListener("pointerdown"',
+            html
+        )
         self.assertIn("Layout ohne KI anwenden", html)
         self.assertIn('fetch(\n          "/api/layout/apply"', html)
 

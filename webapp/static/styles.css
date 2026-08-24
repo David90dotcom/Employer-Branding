@@ -436,7 +436,6 @@ input[type="range"] {
   border: 2px solid #2f67d8;
   border-radius: 8px;
   background: rgba(10, 14, 24, 0.78);
-  resize: both;
   overflow: hidden;
   box-shadow: 0 4px 14px rgba(18, 50, 102, 0.22);
 }
@@ -495,6 +494,30 @@ input[type="range"] {
   flex: 0 0 auto;
   margin-top: 4px;
   font-size: 42%;
+}
+
+.banner-text-resize-handle {
+  position: absolute;
+  z-index: 4;
+  right: 2px;
+  bottom: 2px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 4px;
+  background:
+    linear-gradient(
+      135deg,
+      transparent 0 42%,
+      rgba(255, 255, 255, 0.95) 43% 51%,
+      transparent 52% 62%,
+      rgba(255, 255, 255, 0.95) 63% 71%,
+      transparent 72%
+    ),
+    rgba(47, 103, 216, 0.94);
+  box-shadow: 0 1px 4px rgba(18, 50, 102, 0.32);
+  cursor: nwse-resize;
+  touch-action: none;
 }
 
 .banner-text-box-preview.preview-light-panel {
