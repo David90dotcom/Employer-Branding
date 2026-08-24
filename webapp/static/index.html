@@ -142,12 +142,13 @@
 
       <div class="layout-studio-intro">
         <div>
-          <strong>Vereinfachtes Text- und Layoutwerkzeug</strong>
+          <strong>Text- und Layoutwerkzeug</strong>
           <span>
-            Headline, Subheadline, Schriftwirkung, Ausrichtung, Position und
-            optionales Logo festlegen. Die Gestaltung kann bei einer
-            Generierung oder später über „Layout ohne KI anwenden“ auf eine
-            saubere Bildquelle gesetzt werden.
+            Headline und Subheadline automatisch oder in einem frei
+            platzierbaren Textfeld gestalten und optional ein Logo ergänzen.
+            Die Gestaltung kann bei einer Generierung oder später über
+            „Layout ohne KI anwenden“ auf eine saubere Bildquelle gesetzt
+            werden.
           </span>
         </div>
         <span class="layout-studio-badge">kein Modellaufruf erforderlich</span>
@@ -169,8 +170,8 @@
 
           <textarea
             id="bannerText"
-            rows="2"
-            maxlength="90"
+            rows="3"
+            maxlength="240"
             placeholder="z. B. Deine Zukunft beginnt hier"
           ></textarea>
           <span class="field-help">
@@ -185,12 +186,12 @@
             Subheadline optional
           </label>
 
-          <input
+          <textarea
             id="bannerSubtext"
-            type="text"
-            maxlength="140"
+            rows="2"
+            maxlength="240"
             placeholder="z. B. Werde Teil unseres Teams"
-          >
+          ></textarea>
         </div>
 
         <div class="grid" style="margin-top: 12px;">
@@ -207,6 +208,10 @@
               <option value="top">Oben</option>
               <option value="right">Rechts</option>
             </select>
+            <span class="field-help">
+              Im freien Modus steuert diese Auswahl nur noch, wo das
+              Bildmodell ruhige Textfläche vorbereiten soll.
+            </span>
           </div>
 
           <div class="field">
@@ -272,6 +277,100 @@
             >
           </div>
 
+        </div>
+
+        <div class="field free-text-toggle">
+          <label>
+            <input id="bannerFreePositioning" type="checkbox">
+            Freies Textfeld verwenden
+          </label>
+          <span class="field-help">
+            Das Textfeld kann in der Vorschau verschoben und an der rechten
+            unteren Ecke frei vergrößert werden. Schriftgröße und manuelle
+            Zeilenumbrüche bleiben beim Export erhalten.
+          </span>
+        </div>
+
+        <div id="bannerFreePositioningSettings" class="free-text-settings" hidden>
+          <div class="free-text-controls">
+            <div class="free-text-range-grid">
+              <div class="field">
+                <label for="bannerBoxX">
+                  Position horizontal
+                  <output id="bannerBoxXValue" for="bannerBoxX">56 %</output>
+                </label>
+                <input id="bannerBoxX" type="range" min="0" max="90" step="0.5" value="56">
+              </div>
+
+              <div class="field">
+                <label for="bannerBoxY">
+                  Position vertikal
+                  <output id="bannerBoxYValue" for="bannerBoxY">28 %</output>
+                </label>
+                <input id="bannerBoxY" type="range" min="0" max="90" step="0.5" value="28">
+              </div>
+
+              <div class="field">
+                <label for="bannerBoxWidth">
+                  Textfeldbreite
+                  <output id="bannerBoxWidthValue" for="bannerBoxWidth">40 %</output>
+                </label>
+                <input id="bannerBoxWidth" type="range" min="10" max="100" step="0.5" value="40">
+              </div>
+
+              <div class="field">
+                <label for="bannerBoxHeight">
+                  Textfeldhöhe
+                  <output id="bannerBoxHeightValue" for="bannerBoxHeight">44 %</output>
+                </label>
+                <input id="bannerBoxHeight" type="range" min="10" max="100" step="0.5" value="44">
+              </div>
+
+              <div class="field">
+                <label for="bannerFontSize">
+                  Freie Schriftgröße
+                  <output id="bannerFontSizeValue" for="bannerFontSize">4,8 %</output>
+                </label>
+                <input id="bannerFontSize" type="range" min="1" max="12" step="0.1" value="4.8">
+              </div>
+            </div>
+
+            <span class="field-help">
+              Die Werte beziehen sich proportional auf das Ausgabebild. Die
+              Auswahl „Bannerposition“ legt weiterhin fest, wo bei einer
+              Bildgenerierung ruhige Kampagnenfläche vorbereitet werden soll.
+            </span>
+          </div>
+
+          <div>
+            <strong class="logo-preview-title">Freie Textfeldvorschau</strong>
+            <div id="bannerPlacementPreview" class="banner-placement-preview">
+              <span class="ai-label-preview">AI GENERATED</span>
+              <div id="bannerTextBoxPreview" class="banner-text-box-preview">
+                <div id="bannerTextDragHandle" class="banner-text-drag-handle">
+                  Textfeld verschieben
+                </div>
+                <textarea
+                  id="bannerHeadlinePreviewEditor"
+                  class="banner-preview-editor banner-preview-headline"
+                  rows="2"
+                  maxlength="240"
+                  aria-label="Headline direkt in der Vorschau bearbeiten"
+                ></textarea>
+                <textarea
+                  id="bannerSubtextPreviewEditor"
+                  class="banner-preview-editor banner-preview-subtext"
+                  rows="1"
+                  maxlength="240"
+                  aria-label="Subheadline direkt in der Vorschau bearbeiten"
+                ></textarea>
+              </div>
+            </div>
+            <span class="field-help">
+              Ziehen: am blauen Kopf des Textfeldes. Größe ändern: an der
+              rechten unteren Ecke. Der KI-Hinweis bleibt fest oben rechts.
+            </span>
+          </div>
         </div>
       </div>
 
@@ -549,6 +648,23 @@
     const bannerFontScale = document.getElementById("bannerFontScale");
     const bannerAlign = document.getElementById("bannerAlign");
     const bannerColor = document.getElementById("bannerColor");
+    const bannerFreePositioning = document.getElementById("bannerFreePositioning");
+    const bannerFreePositioningSettings = document.getElementById("bannerFreePositioningSettings");
+    const bannerBoxX = document.getElementById("bannerBoxX");
+    const bannerBoxY = document.getElementById("bannerBoxY");
+    const bannerBoxWidth = document.getElementById("bannerBoxWidth");
+    const bannerBoxHeight = document.getElementById("bannerBoxHeight");
+    const bannerFontSize = document.getElementById("bannerFontSize");
+    const bannerBoxXValue = document.getElementById("bannerBoxXValue");
+    const bannerBoxYValue = document.getElementById("bannerBoxYValue");
+    const bannerBoxWidthValue = document.getElementById("bannerBoxWidthValue");
+    const bannerBoxHeightValue = document.getElementById("bannerBoxHeightValue");
+    const bannerFontSizeValue = document.getElementById("bannerFontSizeValue");
+    const bannerPlacementPreview = document.getElementById("bannerPlacementPreview");
+    const bannerTextBoxPreview = document.getElementById("bannerTextBoxPreview");
+    const bannerTextDragHandle = document.getElementById("bannerTextDragHandle");
+    const bannerHeadlinePreviewEditor = document.getElementById("bannerHeadlinePreviewEditor");
+    const bannerSubtextPreviewEditor = document.getElementById("bannerSubtextPreviewEditor");
 
     const logoEnabled = document.getElementById("logoEnabled");
     const logoSettings = document.getElementById("logoSettings");
@@ -574,6 +690,7 @@
     let selectedLibrarySource = null;
     let libraryItems = [];
     let logoPreviewUrl = null;
+    let updatingFreeTextGeometry = false;
 
 
     // ------------------------------------------------------------
@@ -1338,11 +1455,187 @@
     // Banner
     // ------------------------------------------------------------
 
+    function clampNumber(value, minimum, maximum, fallback) {
+      const parsed = Number.parseFloat(value);
+
+      if (!Number.isFinite(parsed)) {
+        return fallback;
+      }
+
+      return Math.max(minimum, Math.min(maximum, parsed));
+    }
+
+
+    function formatPercent(value) {
+      return `${Number(value).toLocaleString("de-DE", {
+        minimumFractionDigits: Number(value) % 1 ? 1 : 0,
+        maximumFractionDigits: 1
+      })} %`;
+    }
+
+
+    function collectFreeTextGeometry() {
+      const width = clampNumber(bannerBoxWidth.value, 10, 100, 40);
+      const height = clampNumber(bannerBoxHeight.value, 10, 100, 44);
+      const x = clampNumber(bannerBoxX.value, 0, 100 - width, 56);
+      const y = clampNumber(bannerBoxY.value, 0, 100 - height, 28);
+      const fontSize = clampNumber(bannerFontSize.value, 1, 12, 4.8);
+
+      return {x, y, width, height, fontSize};
+    }
+
+
+    function updateFreeTextOutputs(geometry) {
+      bannerBoxXValue.value = formatPercent(geometry.x);
+      bannerBoxYValue.value = formatPercent(geometry.y);
+      bannerBoxWidthValue.value = formatPercent(geometry.width);
+      bannerBoxHeightValue.value = formatPercent(geometry.height);
+      bannerFontSizeValue.value = formatPercent(geometry.fontSize);
+    }
+
+
+    function applyFreeTextPreviewStyle() {
+      const geometry = collectFreeTextGeometry();
+      const previewWidth = Math.max(
+        320,
+        bannerPlacementPreview.clientWidth || 640
+      );
+      const headlineSize = Math.max(
+        10,
+        previewWidth * geometry.fontSize / 100
+      );
+      const fontFamilies = {
+        modern: "Inter, system-ui, sans-serif",
+        bold: "Arial Black, Inter, system-ui, sans-serif",
+        editorial: "Georgia, Times New Roman, serif",
+        condensed: "Bahnschrift Condensed, Arial Narrow, sans-serif"
+      };
+
+      bannerBoxX.value = String(geometry.x);
+      bannerBoxY.value = String(geometry.y);
+      bannerBoxWidth.value = String(geometry.width);
+      bannerBoxHeight.value = String(geometry.height);
+      bannerFontSize.value = String(geometry.fontSize);
+      updateFreeTextOutputs(geometry);
+
+      updatingFreeTextGeometry = true;
+      bannerTextBoxPreview.style.left = `${geometry.x}%`;
+      bannerTextBoxPreview.style.top = `${geometry.y}%`;
+      bannerTextBoxPreview.style.width = `${geometry.width}%`;
+      bannerTextBoxPreview.style.height = `${geometry.height}%`;
+      bannerTextBoxPreview.style.textAlign = bannerAlign.value;
+      bannerHeadlinePreviewEditor.style.fontSize = `${headlineSize}px`;
+      bannerSubtextPreviewEditor.style.fontSize = `${Math.max(8, headlineSize * 0.42)}px`;
+      bannerHeadlinePreviewEditor.style.fontFamily = (
+        fontFamilies[bannerFont.value] || fontFamilies.modern
+      );
+      bannerSubtextPreviewEditor.style.fontFamily = fontFamilies.modern;
+
+      bannerTextBoxPreview.classList.remove(
+        "preview-light-panel",
+        "preview-minimal-shadow",
+        "preview-gradient-bottom"
+      );
+      bannerTextBoxPreview.style.background = "";
+
+      if (bannerStyle.value === "light_panel") {
+        bannerTextBoxPreview.classList.add("preview-light-panel");
+      } else if (bannerStyle.value === "minimal_shadow") {
+        bannerTextBoxPreview.classList.add("preview-minimal-shadow");
+      } else if (bannerStyle.value === "gradient_bottom") {
+        bannerTextBoxPreview.classList.add("preview-gradient-bottom");
+      } else if (bannerStyle.value === "brand_bar") {
+        bannerTextBoxPreview.style.background = bannerColor.value;
+      }
+
+      if (document.activeElement !== bannerHeadlinePreviewEditor) {
+        bannerHeadlinePreviewEditor.value = bannerText.value;
+      }
+
+      if (document.activeElement !== bannerSubtextPreviewEditor) {
+        bannerSubtextPreviewEditor.value = bannerSubtext.value;
+      }
+
+      requestAnimationFrame(() => {
+        updatingFreeTextGeometry = false;
+      });
+    }
+
+
+    function syncFreeTextGeometryFromPreview() {
+      if (
+        updatingFreeTextGeometry ||
+        bannerFreePositioningSettings.hidden
+      ) {
+        return;
+      }
+
+      const previewRect = bannerPlacementPreview.getBoundingClientRect();
+      const boxRect = bannerTextBoxPreview.getBoundingClientRect();
+
+      if (!previewRect.width || !previewRect.height) {
+        return;
+      }
+
+      const width = clampNumber(
+        boxRect.width / previewRect.width * 100,
+        10,
+        100,
+        40
+      );
+      const height = clampNumber(
+        boxRect.height / previewRect.height * 100,
+        10,
+        100,
+        44
+      );
+      const x = clampNumber(
+        (boxRect.left - previewRect.left) / previewRect.width * 100,
+        0,
+        100 - width,
+        56
+      );
+      const y = clampNumber(
+        (boxRect.top - previewRect.top) / previewRect.height * 100,
+        0,
+        100 - height,
+        28
+      );
+
+      bannerBoxX.value = String(Math.round(x * 10) / 10);
+      bannerBoxY.value = String(Math.round(y * 10) / 10);
+      bannerBoxWidth.value = String(Math.round(width * 10) / 10);
+      bannerBoxHeight.value = String(Math.round(height * 10) / 10);
+      updateFreeTextOutputs(collectFreeTextGeometry());
+      applyFreeTextPreviewStyle();
+      schedulePromptPreview();
+    }
+
+
+    function updateFreeTextVisibility() {
+      bannerFreePositioningSettings.hidden = !bannerFreePositioning.checked;
+      bannerFontScale.disabled = bannerFreePositioning.checked;
+      bannerFontScale.closest(".field")?.classList.toggle(
+        "field-disabled",
+        bannerFreePositioning.checked
+      );
+      bannerFontScale.title = bannerFreePositioning.checked
+        ? "Im freien Textfeld wird die stufenlose Schriftgröße verwendet."
+        : "";
+
+      if (bannerFreePositioning.checked) {
+        requestAnimationFrame(applyFreeTextPreviewStyle);
+      }
+    }
+
+
     function updateBannerVisibility() {
       bannerSettings.style.display = bannerEnabled.checked
         ? "block"
         : "none";
 
+      updateFreeTextVisibility();
+      applyFreeTextPreviewStyle();
       syncCampaignLayout();
       schedulePromptPreview();
     }
@@ -1358,9 +1651,74 @@
         font: bannerFont.value,
         font_scale: bannerFontScale.value,
         align: bannerAlign.value,
-        color: bannerColor.value
+        color: bannerColor.value,
+        free_positioning: Boolean(bannerFreePositioning.checked),
+        box_x_percent: Number.parseFloat(bannerBoxX.value),
+        box_y_percent: Number.parseFloat(bannerBoxY.value),
+        box_width_percent: Number.parseFloat(bannerBoxWidth.value),
+        box_height_percent: Number.parseFloat(bannerBoxHeight.value),
+        font_size_percent: Number.parseFloat(bannerFontSize.value)
       };
     }
+
+
+    const freeTextResizeObserver = new ResizeObserver(
+      syncFreeTextGeometryFromPreview
+    );
+    freeTextResizeObserver.observe(bannerTextBoxPreview);
+
+
+    bannerTextDragHandle.addEventListener("pointerdown", event => {
+      if (!bannerFreePositioning.checked) {
+        return;
+      }
+
+      event.preventDefault();
+      bannerTextDragHandle.setPointerCapture(event.pointerId);
+      const startGeometry = collectFreeTextGeometry();
+      const startX = event.clientX;
+      const startY = event.clientY;
+
+      function moveTextBox(moveEvent) {
+        const previewRect = bannerPlacementPreview.getBoundingClientRect();
+
+        if (!previewRect.width || !previewRect.height) {
+          return;
+        }
+
+        const deltaX = (moveEvent.clientX - startX) / previewRect.width * 100;
+        const deltaY = (moveEvent.clientY - startY) / previewRect.height * 100;
+        bannerBoxX.value = String(clampNumber(
+          startGeometry.x + deltaX,
+          0,
+          100 - startGeometry.width,
+          startGeometry.x
+        ));
+        bannerBoxY.value = String(clampNumber(
+          startGeometry.y + deltaY,
+          0,
+          100 - startGeometry.height,
+          startGeometry.y
+        ));
+        applyFreeTextPreviewStyle();
+      }
+
+      function finishDrag(finishEvent) {
+        bannerTextDragHandle.removeEventListener("pointermove", moveTextBox);
+        bannerTextDragHandle.removeEventListener("pointerup", finishDrag);
+        bannerTextDragHandle.removeEventListener("pointercancel", finishDrag);
+
+        if (bannerTextDragHandle.hasPointerCapture(finishEvent.pointerId)) {
+          bannerTextDragHandle.releasePointerCapture(finishEvent.pointerId);
+        }
+
+        schedulePromptPreview();
+      }
+
+      bannerTextDragHandle.addEventListener("pointermove", moveTextBox);
+      bannerTextDragHandle.addEventListener("pointerup", finishDrag);
+      bannerTextDragHandle.addEventListener("pointercancel", finishDrag);
+    });
 
 
     // ------------------------------------------------------------
@@ -2159,12 +2517,18 @@
 
     bannerText.addEventListener(
       "input",
-      schedulePromptPreview
+      () => {
+        applyFreeTextPreviewStyle();
+        schedulePromptPreview();
+      }
     );
 
     bannerSubtext.addEventListener(
       "input",
-      schedulePromptPreview
+      () => {
+        applyFreeTextPreviewStyle();
+        schedulePromptPreview();
+      }
     );
 
     bannerPosition.addEventListener(
@@ -2174,12 +2538,18 @@
 
     bannerStyle.addEventListener(
       "change",
-      schedulePromptPreview
+      () => {
+        applyFreeTextPreviewStyle();
+        schedulePromptPreview();
+      }
     );
 
     bannerFont.addEventListener(
       "change",
-      schedulePromptPreview
+      () => {
+        applyFreeTextPreviewStyle();
+        schedulePromptPreview();
+      }
     );
 
     bannerFontScale.addEventListener(
@@ -2189,13 +2559,49 @@
 
     bannerAlign.addEventListener(
       "change",
-      schedulePromptPreview
+      () => {
+        applyFreeTextPreviewStyle();
+        schedulePromptPreview();
+      }
     );
 
     bannerColor.addEventListener(
       "input",
-      schedulePromptPreview
+      () => {
+        applyFreeTextPreviewStyle();
+        schedulePromptPreview();
+      }
     );
+
+    bannerFreePositioning.addEventListener("change", () => {
+      updateFreeTextVisibility();
+      schedulePromptPreview();
+    });
+
+    for (const control of [
+      bannerBoxX,
+      bannerBoxY,
+      bannerBoxWidth,
+      bannerBoxHeight,
+      bannerFontSize
+    ]) {
+      control.addEventListener("input", () => {
+        applyFreeTextPreviewStyle();
+        schedulePromptPreview();
+      });
+    }
+
+    bannerHeadlinePreviewEditor.addEventListener("input", () => {
+      bannerText.value = bannerHeadlinePreviewEditor.value;
+      schedulePromptPreview();
+    });
+
+    bannerSubtextPreviewEditor.addEventListener("input", () => {
+      bannerSubtext.value = bannerSubtextPreviewEditor.value;
+      schedulePromptPreview();
+    });
+
+    window.addEventListener("resize", applyFreeTextPreviewStyle);
 
     logoEnabled.addEventListener("change", () => {
       updateLogoVisibility();

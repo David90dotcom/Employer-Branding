@@ -1036,11 +1036,114 @@ class GenerationModeTests(unittest.TestCase):
     def test_layout_studio_exposes_typography_and_no_ai_action(self):
         html = module.INDEX_PATH.read_text(encoding="utf-8")
 
-        self.assertIn("Vereinfachtes Text- und Layoutwerkzeug", html)
+        self.assertIn("Text- und Layoutwerkzeug", html)
         self.assertIn('<textarea\n            id="bannerText"', html)
         self.assertIn('id="bannerFontScale"', html)
+        self.assertIn('id="bannerFreePositioning"', html)
+        self.assertIn('id="bannerTextBoxPreview"', html)
+        self.assertIn('id="bannerFontSize"', html)
+        self.assertIn("ResizeObserver", html)
+        self.assertIn('addEventListener("pointerdown"', html)
         self.assertIn("Layout ohne KI anwenden", html)
         self.assertIn('fetch(\n          "/api/layout/apply"', html)
+
+    def test_free_text_box_settings_are_bounded_and_keep_manual_breaks(self):
+        banner = module.normalize_banner_settings({
+            "banner": {
+                "enabled": True,
+                "text": "Ein Studium.\r\nDrei Praxiswelten.",
+                "subtext": "Duales Studium\r\nbei Lidl",
+                "free_positioning": "true",
+                "box_x_percent": 95,
+                "box_y_percent": -10,
+                "box_width_percent": 80,
+                "box_height_percent": 120,
+                "font_size_percent": 20
+            }
+        })
+
+        self.assertTrue(banner["free_positioning"])
+        self.assertEqual(banner["text"], "Ein Studium.\nDrei Praxiswelten.")
+        self.assertEqual(banner["subtext"], "Duales Studium\nbei Lidl")
+        self.assertEqual(banner["box_x_percent"], 20)
+        self.assertEqual(banner["box_y_percent"], 0)
+        self.assertEqual(banner["box_width_percent"], 80)
+        self.assertEqual(banner["box_height_percent"], 100)
+        self.assertEqual(banner["font_size_percent"], 12)
+
+    def test_free_text_box_layout_uses_relative_geometry_and_font_size(self):
+        banner = module.normalize_banner_settings({
+            "banner": {
+                "enabled": True,
+                "text": "Ein Studium.\nDrei Praxiswelten.",
+                "free_positioning": True,
+                "box_x_percent": 50,
+                "box_y_percent": 20,
+                "box_width_percent": 40,
+                "box_height_percent": 50,
+                "font_size_percent": 6
+            }
+        })
+
+        box, font_size = module.calculate_free_text_box_layout(
+            (1000, 500),
+            banner
+        )
+
+        self.assertEqual(box, (500, 100, 400, 250))
+        self.assertEqual(font_size, 60)
+
+    def test_free_text_box_renders_without_automatic_font_reduction(self):
+        banner = module.normalize_banner_settings({
+            "banner": {
+                "enabled": True,
+                "text": "Ein Studium.\nDrei Praxiswelten.",
+                "subtext": "Duales Studium bei Lidl",
+                "style": "minimal_shadow",
+                "font": "bold",
+                "align": "left",
+                "free_positioning": True,
+                "box_x_percent": 48,
+                "box_y_percent": 20,
+                "box_width_percent": 48,
+                "box_height_percent": 65,
+                "font_size_percent": 4
+            }
+        })
+        output = module.render_banner_on_image(
+            self.make_test_image(960, 540),
+            banner
+        )
+
+        with Image.open(BytesIO(output)) as rendered:
+            self.assertEqual(rendered.size, (960, 540))
+            self.assertEqual(rendered.format, "PNG")
+
+    def test_free_text_box_reports_when_fixed_text_does_not_fit(self):
+        banner = module.normalize_banner_settings({
+            "banner": {
+                "enabled": True,
+                "text": "UNTEILBARESSEHRLANGESKAMPAGNENWORT",
+                "style": "minimal_shadow",
+                "font": "bold",
+                "free_positioning": True,
+                "box_x_percent": 0,
+                "box_y_percent": 0,
+                "box_width_percent": 10,
+                "box_height_percent": 10,
+                "font_size_percent": 12
+            }
+        })
+
+        with self.assertRaises(HTTPException) as raised:
+            module.render_banner_on_image(
+                self.make_test_image(960, 540),
+                banner
+            )
+
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn("passt", raised.exception.detail)
+        self.assertIn("Textfeld vergrößern", raised.exception.detail)
 
     def test_banner_editor_uses_readable_lines_and_manual_breaks(self):
         class FakeFont:

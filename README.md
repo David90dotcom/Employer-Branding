@@ -172,10 +172,20 @@ verwendet die App stets die saubere interne Bildquelle und ruft weder ComfyUI
 noch die Cloud Images API erneut auf. Das vereinfachte Textwerkzeug bietet
 Headline, optionale Subheadline, Position, Bannerstil, Schriftstil,
 Schriftgröße, Ausrichtung und Akzentfarbe. Ein optionales Logo kann weiterhin
-als PNG frei positioniert und skaliert werden. Die automatische Typografie
-verkleinert die Schrift bei Bedarf, um einzelne Wörter in einer eigenen Zeile
-zu vermeiden. In der Headline können Zeilenumbrüche außerdem mit der
-Eingabetaste bewusst festgelegt werden.
+als PNG frei positioniert und skaliert werden. Standardmäßig verkleinert die
+automatische Typografie die Schrift bei Bedarf, um einzelne Wörter in einer
+eigenen Zeile zu vermeiden. In Headline und Subheadline können Zeilenumbrüche
+mit der Eingabetaste bewusst festgelegt werden.
+
+Optional lässt sich ein freies Textfeld aktivieren. Es kann direkt in der
+16:9-Vorschau über einen eigenen Griff verschoben und an der rechten unteren
+Ecke stufenlos vergrößert werden. Horizontale und vertikale Position, Breite,
+Höhe und Schriftgröße können zusätzlich über Prozentregler exakt eingestellt
+werden. In diesem Modus bleibt die gewählte Schriftgröße verbindlich; passt der
+Text nicht in das Textfeld, fordert die App zum Vergrößern des Feldes, zum
+Verkleinern der Schrift oder zum Setzen weiterer manueller Zeilenumbrüche auf,
+statt die Schrift unbemerkt zu reduzieren. Die Geometrie dient ausschließlich
+dem deterministischen Layout und wird nicht an das Bildmodell gesendet.
 
 `Layout ohne KI anwenden` erzeugt zunächst eine neue temporäre
 Gestaltungsvariante. Sie kann kontrolliert betrachtet und anschließend über

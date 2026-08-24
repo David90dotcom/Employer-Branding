@@ -800,8 +800,14 @@ def normalize_banner_settings(raw_components):
 
     enabled = bool(raw_banner.get("enabled", False))
 
-    text = str(raw_banner.get("text", "") or "").strip()
-    subtext = str(raw_banner.get("subtext", "") or "").strip()
+    text = str(raw_banner.get("text", "") or "").replace(
+        "\r\n",
+        "\n"
+    ).replace("\r", "\n").strip()
+    subtext = str(raw_banner.get("subtext", "") or "").replace(
+        "\r\n",
+        "\n"
+    ).replace("\r", "\n").strip()
 
     position = str(raw_banner.get("position", "auto") or "auto").strip()
     style = str(raw_banner.get("style", "dark_glass") or "dark_glass").strip()
@@ -811,6 +817,56 @@ def normalize_banner_settings(raw_components):
     ).strip()
     align = str(raw_banner.get("align", "left") or "left").strip()
     color = str(raw_banner.get("color", "#1457ff") or "#1457ff").strip()
+
+    free_positioning_value = raw_banner.get("free_positioning", False)
+    free_positioning = (
+        free_positioning_value is True or
+        str(free_positioning_value).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on"
+        }
+    )
+
+    def bounded_number(name, default, minimum, maximum):
+        try:
+            value = float(raw_banner.get(name, default))
+        except (TypeError, ValueError):
+            value = float(default)
+
+        return max(float(minimum), min(float(maximum), value))
+
+    box_width_percent = bounded_number(
+        "box_width_percent",
+        40,
+        10,
+        100
+    )
+    box_height_percent = bounded_number(
+        "box_height_percent",
+        44,
+        10,
+        100
+    )
+    box_x_percent = bounded_number(
+        "box_x_percent",
+        56,
+        0,
+        100 - box_width_percent
+    )
+    box_y_percent = bounded_number(
+        "box_y_percent",
+        28,
+        0,
+        100 - box_height_percent
+    )
+    font_size_percent = bounded_number(
+        "font_size_percent",
+        4.8,
+        1.0,
+        12.0
+    )
 
     allowed_positions = {
         "auto",
@@ -865,11 +921,11 @@ def normalize_banner_settings(raw_components):
     if not color.startswith("#") or len(color) not in (4, 7):
         color = "#1457ff"
 
-    if len(text) > 90:
-        text = text[:90].strip()
+    if len(text) > 240:
+        text = text[:240].strip()
 
-    if len(subtext) > 140:
-        subtext = subtext[:140].strip()
+    if len(subtext) > 240:
+        subtext = subtext[:240].strip()
 
     if enabled and not text:
         raise HTTPException(
@@ -886,7 +942,13 @@ def normalize_banner_settings(raw_components):
         "font": font,
         "font_scale": font_scale,
         "align": align,
-        "color": color
+        "color": color,
+        "free_positioning": free_positioning,
+        "box_x_percent": round(box_x_percent, 2),
+        "box_y_percent": round(box_y_percent, 2),
+        "box_width_percent": round(box_width_percent, 2),
+        "box_height_percent": round(box_height_percent, 2),
+        "font_size_percent": round(font_size_percent, 2)
     }
 
 
@@ -2018,10 +2080,41 @@ def font_candidates(font_style, bold=False):
             "arial.ttf"
         ])
 
-    return [
+    candidates = [
         windows_fonts / name
         for name in names
     ]
+
+    linux_font_groups = {
+        "editorial": [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf"
+        ],
+        "condensed": [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf"
+        ],
+        "bold": [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
+        ],
+        "modern": [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
+        ]
+    }
+    candidates.extend(
+        Path(path)
+        for path in linux_font_groups.get(font_style, [])
+    )
+
+    if not bold:
+        candidates.extend([
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf")
+        ])
+
+    return candidates
 
 
 def load_font(font_style, size, bold=False):
@@ -2223,6 +2316,62 @@ def draw_text_lines(
     return current_y
 
 
+def calculate_free_text_box_layout(base_size, banner):
+    """Translate the browser's percentage geometry into image pixels."""
+    width, height = base_size
+    box_width = max(
+        1,
+        round(width * float(banner.get("box_width_percent", 40)) / 100)
+    )
+    box_height = max(
+        1,
+        round(height * float(banner.get("box_height_percent", 44)) / 100)
+    )
+    box_width = min(width, box_width)
+    box_height = min(height, box_height)
+    requested_x = round(
+        width * float(banner.get("box_x_percent", 56)) / 100
+    )
+    requested_y = round(
+        height * float(banner.get("box_y_percent", 28)) / 100
+    )
+    box_x = max(0, min(width - box_width, requested_x))
+    box_y = max(0, min(height - box_height, requested_y))
+    font_size = max(
+        12,
+        min(
+            240,
+            round(
+                width * float(banner.get("font_size_percent", 4.8)) / 100
+            )
+        )
+    )
+
+    return (
+        box_x,
+        box_y,
+        box_width,
+        box_height
+    ), font_size
+
+
+def fixed_text_layout(draw, text, font, max_width, line_gap):
+    lines = wrap_text(draw, text, font, max_width)
+    line_heights = [
+        text_size(draw, line, font)[1]
+        for line in lines
+    ]
+    total_height = (
+        sum(line_heights) +
+        max(0, len(lines) - 1) * line_gap
+    )
+    widest = max(
+        [text_size(draw, line, font)[0] for line in lines] or [0]
+    )
+
+    return lines, total_height, widest
+
+
 def render_banner_on_image(image_bytes, banner):
     image = Image.open(BytesIO(image_bytes)).convert("RGBA")
     width, height = image.size
@@ -2242,10 +2391,25 @@ def render_banner_on_image(image_bytes, banner):
         banner.get("color", "#1457ff")
     )
 
+    free_positioning = bool(banner.get("free_positioning", False))
     margin = int(min(width, height) * 0.045)
     radius = int(min(width, height) * 0.035)
 
-    if position in {"left", "right"}:
+    if free_positioning:
+        (
+            box_x,
+            box_y,
+            box_width,
+            box_height
+        ), max_headline_size = calculate_free_text_box_layout(
+            image.size,
+            banner
+        )
+        radius = min(radius, max(4, int(min(box_width, box_height) * 0.08)))
+        inner_pad = max(4, int(min(box_width, box_height) * 0.065))
+        text_max_width = max(1, box_width - 2 * inner_pad)
+        headline_max_height = max(1, box_height - 2 * inner_pad)
+    elif position in {"left", "right"}:
         box_width = int(width * 0.38)
         box_height = height - 2 * margin
         box_x = (
@@ -2268,46 +2432,99 @@ def render_banner_on_image(image_bytes, banner):
         headline_max_height = int(box_height * 0.48)
         max_headline_size = int(width * 0.070)
 
-    font_scale_factor = {
-        "compact": 0.82,
-        "standard": 1.0,
-        "large": 1.16
-    }.get(font_scale, 1.0)
-    max_headline_size = int(max_headline_size * font_scale_factor)
+    if not free_positioning:
+        font_scale_factor = {
+            "compact": 0.82,
+            "standard": 1.0,
+            "large": 1.16
+        }.get(font_scale, 1.0)
+        max_headline_size = int(max_headline_size * font_scale_factor)
 
     headline = banner.get("text", "")
     subtext = banner.get("subtext", "")
 
-    headline_font, headline_lines, headline_height = fit_text(
-        draw=draw,
-        text=headline,
-        font_style=font_style,
-        max_width=text_max_width,
-        max_height=headline_max_height,
-        max_size=max(44, min(96, max_headline_size)),
-        min_size=26,
-        bold=True,
-        preferred_max_lines=2
-    )
+    if free_positioning:
+        headline_font = load_font(
+            font_style,
+            max_headline_size,
+            bold=True
+        )
+        line_gap = max(1, int(max_headline_size * 0.25))
+        (
+            headline_lines,
+            headline_height,
+            headline_width
+        ) = fixed_text_layout(
+            draw,
+            headline,
+            headline_font,
+            text_max_width,
+            line_gap
+        )
+    else:
+        headline_font, headline_lines, headline_height = fit_text(
+            draw=draw,
+            text=headline,
+            font_style=font_style,
+            max_width=text_max_width,
+            max_height=headline_max_height,
+            max_size=max(44, min(96, max_headline_size)),
+            min_size=26,
+            bold=True,
+            preferred_max_lines=2
+        )
+        headline_width = max(
+            [
+                text_size(draw, line, headline_font)[0]
+                for line in headline_lines
+            ] or [0]
+        )
 
     sub_font = None
     sub_lines = []
     sub_height = 0
 
-    if subtext:
-        sub_font, sub_lines, sub_height = fit_text(
-            draw=draw,
-            text=subtext,
-            font_style="modern",
-            max_width=text_max_width,
-            max_height=int(box_height * 0.28),
-            max_size=max(22, int(max_headline_size * 0.42)),
-            min_size=16,
-            bold=False,
-            preferred_max_lines=1
-        )
+    sub_width = 0
 
-    line_gap = int(headline_font.size * 0.25)
+    if subtext:
+        if free_positioning:
+            sub_size = max(12, int(max_headline_size * 0.42))
+            sub_font = load_font(
+                "modern",
+                sub_size,
+                bold=False
+            )
+            (
+                sub_lines,
+                sub_height,
+                sub_width
+            ) = fixed_text_layout(
+                draw,
+                subtext,
+                sub_font,
+                text_max_width,
+                max(1, int(sub_size * 0.25))
+            )
+        else:
+            sub_font, sub_lines, sub_height = fit_text(
+                draw=draw,
+                text=subtext,
+                font_style="modern",
+                max_width=text_max_width,
+                max_height=int(box_height * 0.28),
+                max_size=max(22, int(max_headline_size * 0.42)),
+                min_size=16,
+                bold=False,
+                preferred_max_lines=1
+            )
+            sub_width = max(
+                [
+                    text_size(draw, line, sub_font)[0]
+                    for line in sub_lines
+                ] or [0]
+            )
+
+    line_gap = max(1, int(headline_font.size * 0.25))
     sub_gap = int(headline_font.size * 0.28)
 
     total_text_height = headline_height
@@ -2315,7 +2532,21 @@ def render_banner_on_image(image_bytes, banner):
     if sub_lines:
         total_text_height += sub_gap + sub_height
 
-    if total_text_height + 2 * inner_pad > box_height:
+    if free_positioning and (
+        headline_width > text_max_width or
+        sub_width > text_max_width or
+        total_text_height > headline_max_height
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Der Text passt mit der gewählten Schriftgröße nicht in das "
+                "freie Textfeld. Bitte das Textfeld vergrößern, die "
+                "Schriftgröße reduzieren oder weitere Zeilenumbrüche setzen."
+            )
+        )
+
+    if not free_positioning and total_text_height + 2 * inner_pad > box_height:
         box_height = total_text_height + 2 * inner_pad
 
         if position == "bottom":
@@ -2374,17 +2605,31 @@ def render_banner_on_image(image_bytes, banner):
         shadow = False
 
     elif style == "gradient_bottom":
-        image = draw_gradient_overlay(
-            image,
-            "top" if position == "top" else "bottom",
-            box_height + margin * 2
-        )
+        if free_positioning:
+            for offset in range(box_height):
+                progress = offset / max(1, box_height - 1)
+                alpha = int(35 + 165 * progress)
+                overlay_draw.line(
+                    (
+                        box_x,
+                        box_y + offset,
+                        box_x + box_width,
+                        box_y + offset
+                    ),
+                    fill=(0, 0, 0, alpha)
+                )
+        else:
+            image = draw_gradient_overlay(
+                image,
+                "top" if position == "top" else "bottom",
+                box_height + margin * 2
+            )
 
-        overlay = Image.new(
-            "RGBA",
-            image.size,
-            (0, 0, 0, 0)
-        )
+            overlay = Image.new(
+                "RGBA",
+                image.size,
+                (0, 0, 0, 0)
+            )
 
         text_fill = (255, 255, 255, 255)
         sub_fill = (240, 242, 248, 240)
@@ -2403,7 +2648,11 @@ def render_banner_on_image(image_bytes, banner):
     draw = ImageDraw.Draw(image)
 
     text_x = box_x + inner_pad
-    text_y = box_y + int((box_height - total_text_height) / 2)
+    text_y = (
+        box_y + inner_pad
+        if free_positioning
+        else box_y + int((box_height - total_text_height) / 2)
+    )
 
     next_y = draw_text_lines(
         draw=draw,
