@@ -288,6 +288,178 @@
     ]
   },
   {
+    "id": "mainGenderPresentation",
+    "label": "Geschlechtspräsentation der Hauptperson",
+    "type": "select",
+    "ui_group": "representation",
+    "help": "Optionale sichtbare Gestaltung; sie sagt nichts über Geschlechtsidentität, Kompetenz oder berufliche Rolle aus.",
+    "options": [
+      {
+        "label": "Keine zusätzliche Vorgabe",
+        "value": "",
+        "default": true
+      },
+      {
+        "label": "Feminin präsentiert",
+        "value": "The main subject has a feminine gender presentation expressed through natural styling and overall appearance without stereotypical exaggeration."
+      },
+      {
+        "label": "Maskulin präsentiert",
+        "value": "The main subject has a masculine gender presentation expressed through natural styling and overall appearance without stereotypical exaggeration."
+      },
+      {
+        "label": "Androgyn / geschlechtsneutral präsentiert",
+        "value": "The main subject has an androgynous or gender-neutral presentation with natural styling and without stereotypical exaggeration."
+      }
+    ]
+  },
+  {
+    "id": "supportGenderPresentation",
+    "label": "Geschlechtspräsentation der Begleitperson(en)",
+    "type": "select",
+    "ui_group": "representation",
+    "help": "Wird bei einer einzelnen Hauptperson ausgeblendet. Die Auswahl bleibt unabhängig von Hierarchie und Tätigkeit.",
+    "options": [
+      {
+        "label": "Keine zusätzliche Vorgabe",
+        "value": "",
+        "default": true
+      },
+      {
+        "label": "Feminin präsentiert",
+        "value": "Every supporting person has a feminine gender presentation expressed through natural styling and overall appearance without stereotypical exaggeration."
+      },
+      {
+        "label": "Maskulin präsentiert",
+        "value": "Every supporting person has a masculine gender presentation expressed through natural styling and overall appearance without stereotypical exaggeration."
+      },
+      {
+        "label": "Androgyn / geschlechtsneutral präsentiert",
+        "value": "Every supporting person has an androgynous or gender-neutral presentation with natural styling and without stereotypical exaggeration."
+      }
+    ]
+  },
+  {
+    "id": "mainSkinTone",
+    "label": "Sichtbarer Hautton der Hauptperson",
+    "type": "select",
+    "ui_group": "representation",
+    "help": "Steuert nur den sichtbaren Hautton. Ethnie, Nationalität, Religion und soziale Herkunft werden daraus nicht abgeleitet.",
+    "options": [
+      {
+        "label": "Keine zusätzliche Vorgabe",
+        "value": "",
+        "default": true
+      },
+      {
+        "label": "Heller Hautton",
+        "value": "The main subject has a natural light visible skin tone."
+      },
+      {
+        "label": "Mittlerer Hautton",
+        "value": "The main subject has a natural medium visible skin tone."
+      },
+      {
+        "label": "Dunkler Hautton",
+        "value": "The main subject has a natural dark visible skin tone."
+      },
+      {
+        "label": "Sehr dunkler Hautton",
+        "value": "The main subject has a natural deep visible skin tone."
+      }
+    ]
+  },
+  {
+    "id": "supportSkinTone",
+    "label": "Sichtbarer Hautton der Begleitperson(en)",
+    "type": "select",
+    "ui_group": "representation",
+    "help": "Wird bei einer einzelnen Hauptperson ausgeblendet und nicht mit Rolle, Status oder Kompetenz verknüpft.",
+    "options": [
+      {
+        "label": "Keine zusätzliche Vorgabe",
+        "value": "",
+        "default": true
+      },
+      {
+        "label": "Heller Hautton",
+        "value": "Every supporting person has a natural light visible skin tone."
+      },
+      {
+        "label": "Mittlerer Hautton",
+        "value": "Every supporting person has a natural medium visible skin tone."
+      },
+      {
+        "label": "Dunkler Hautton",
+        "value": "Every supporting person has a natural dark visible skin tone."
+      },
+      {
+        "label": "Sehr dunkler Hautton",
+        "value": "Every supporting person has a natural deep visible skin tone."
+      }
+    ]
+  },
+  {
+    "id": "mainHairTexture",
+    "label": "Haarstruktur der Hauptperson",
+    "type": "select",
+    "ui_group": "representation",
+    "help": "Optionale sichtbare Haarstruktur ohne kulturelle oder charakterliche Zuschreibung.",
+    "options": [
+      {
+        "label": "Keine zusätzliche Vorgabe",
+        "value": "",
+        "default": true
+      },
+      {
+        "label": "Glattes Haar",
+        "value": "The main subject has naturally straight hair."
+      },
+      {
+        "label": "Gewelltes Haar",
+        "value": "The main subject has naturally wavy hair."
+      },
+      {
+        "label": "Lockiges Haar",
+        "value": "The main subject has naturally curly hair."
+      },
+      {
+        "label": "Stark gelocktes Haar",
+        "value": "The main subject has naturally tightly coiled hair."
+      }
+    ]
+  },
+  {
+    "id": "supportHairTexture",
+    "label": "Haarstruktur der Begleitperson(en)",
+    "type": "select",
+    "ui_group": "representation",
+    "help": "Wird bei einer einzelnen Hauptperson ausgeblendet; die Auswahl bleibt eine rein sichtbare Gestaltungsangabe.",
+    "options": [
+      {
+        "label": "Keine zusätzliche Vorgabe",
+        "value": "",
+        "default": true
+      },
+      {
+        "label": "Glattes Haar",
+        "value": "Every supporting person has naturally straight hair."
+      },
+      {
+        "label": "Gewelltes Haar",
+        "value": "Every supporting person has naturally wavy hair."
+      },
+      {
+        "label": "Lockiges Haar",
+        "value": "Every supporting person has naturally curly hair."
+      },
+      {
+        "label": "Stark gelocktes Haar",
+        "value": "Every supporting person has naturally tightly coiled hair."
+      }
+    ]
+  },
+  {
     "id": "backgroundPolicy",
     "label": "Hintergrundpersonen",
     "type": "select",

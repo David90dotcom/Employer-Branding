@@ -523,6 +523,16 @@ class GenerationModeTests(unittest.TestCase):
             for option in action_field["options"]
             if "solo" in option.get("recommended_for", [])
         )
+        by_id = {field["id"]: field for field in fields}
+        raw["supportGenderPresentation"] = by_id[
+            "supportGenderPresentation"
+        ]["options"][1]["value"]
+        raw["supportSkinTone"] = by_id[
+            "supportSkinTone"
+        ]["options"][1]["value"]
+        raw["supportHairTexture"] = by_id[
+            "supportHairTexture"
+        ]["options"][1]["value"]
 
         components = module.normalize_prompt_components(
             raw,
@@ -534,10 +544,102 @@ class GenerationModeTests(unittest.TestCase):
         )
 
         self.assertEqual(components["supportingOutfit"], "")
+        self.assertEqual(components["supportGenderPresentation"], "")
+        self.assertEqual(components["supportSkinTone"], "")
+        self.assertEqual(components["supportHairTexture"], "")
         self.assertNotIn(
             "Every supporting person wears",
             package["render_prompt"]
         )
+
+    def test_representation_controls_are_optional_and_role_specific(self):
+        fields = module.load_ui_fields("text_to_image")
+        by_id = {field["id"]: field for field in fields}
+        representation_ids = {
+            "mainGenderPresentation",
+            "supportGenderPresentation",
+            "mainSkinTone",
+            "supportSkinTone",
+            "mainHairTexture",
+            "supportHairTexture"
+        }
+
+        self.assertTrue(representation_ids.issubset(by_id))
+
+        for field_id in representation_ids:
+            field = by_id[field_id]
+            default_option = next(
+                option
+                for option in field["options"]
+                if option.get("default")
+            )
+            self.assertEqual(field.get("ui_group"), "representation")
+            self.assertEqual(default_option["value"], "")
+
+        raw = default_components_for_mode("text_to_image")
+        components = module.normalize_prompt_components(raw, "text_to_image")
+        package = module.build_prompt_package(components, "text_to_image")
+
+        self.assertNotIn(
+            "selected visible appearance traits",
+            package["render_prompt"]
+        )
+
+    def test_selected_representation_is_prompted_and_humanly_reviewed(self):
+        fields = {
+            field["id"]: field
+            for field in module.load_ui_fields("text_to_image")
+        }
+        raw = default_components_for_mode("text_to_image")
+        selections = {
+            "mainGenderPresentation": "Feminin präsentiert",
+            "supportGenderPresentation": "Maskulin präsentiert",
+            "mainSkinTone": "Dunkler Hautton",
+            "supportSkinTone": "Heller Hautton",
+            "mainHairTexture": "Stark gelocktes Haar",
+            "supportHairTexture": "Gewelltes Haar"
+        }
+
+        for field_id, label in selections.items():
+            raw[field_id] = next(
+                option["value"]
+                for option in fields[field_id]["options"]
+                if option["label"] == label
+            )
+
+        components = module.normalize_prompt_components(raw, "text_to_image")
+        package = module.build_prompt_package(components, "text_to_image")
+        prompt = package["render_prompt"]
+
+        self.assertIn("feminine gender presentation", prompt)
+        self.assertIn("masculine gender presentation", prompt)
+        self.assertIn("natural dark visible skin tone", prompt)
+        self.assertIn("natural light visible skin tone", prompt)
+        self.assertIn("naturally tightly coiled hair", prompt)
+        self.assertIn("naturally wavy hair", prompt)
+        self.assertIn("independent of competence", prompt)
+        self.assertIn("Do not infer nationality, ethnicity", prompt)
+        self.assertIn("tokenistic diversity arrangement", package[
+            "negative_prompt"
+        ])
+        self.assertTrue(any(
+            "Repräsentationsmerkmale" in criterion["label"]
+            for criterion in package["success_criteria"]
+        ))
+
+    def test_prompt_chain_preserves_visible_representation_traits(self):
+        raw = default_components_for_mode("prompt_chain")
+        fields = {
+            field["id"]: field
+            for field in module.load_ui_fields("prompt_chain")
+        }
+        raw["framing"] = fields["framing"]["options"][1]["value"]
+        components = module.normalize_prompt_components(raw, "prompt_chain")
+        prompt = module.build_prompt_from_components(components, "prompt_chain")
+
+        self.assertIn("gender presentation", prompt)
+        self.assertIn("hair texture", prompt)
+        self.assertIn("skin tone", prompt)
 
     def test_prompt_chain_uses_a_saved_synthetic_source(self):
         self.assertTrue(
@@ -1345,6 +1447,17 @@ class GenerationModeTests(unittest.TestCase):
         self.assertNotIn('type="password"', html)
         self.assertNotIn('id="openaiApiKey"', html)
         self.assertNotIn('name="OPENAI_API_KEY"', html)
+
+    def test_representation_controls_use_a_collapsed_optional_ui_group(self):
+        html = module.INDEX_PATH.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "Repräsentation der fiktiven Personen (optional)",
+            html
+        )
+        self.assertIn('details.className = "form-subsection"', html)
+        self.assertIn('groupId !== "representation"', html)
+        self.assertNotIn("Diversitätsgrad", html)
 
     def test_expired_temporary_results_are_removed(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

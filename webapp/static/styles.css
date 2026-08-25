@@ -665,6 +665,37 @@ input[type="range"] {
   margin-top: 14px;
 }
 
+.form-subsection {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  border: 1px solid #c9d8eb;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.form-subsection summary {
+  padding: 13px 15px;
+  cursor: pointer;
+  color: #244f9f;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.form-subsection[open] summary {
+  border-bottom: 1px solid #dbe5f2;
+}
+
+.form-subsection-description {
+  margin: 13px 15px 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.form-section .form-subsection-grid {
+  margin: 10px 15px 15px;
+}
+
 .constraint-panel {
   margin-top: 18px;
   padding: 16px 18px;

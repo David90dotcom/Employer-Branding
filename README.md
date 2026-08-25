@@ -89,7 +89,9 @@ Personenzahl, Rollenverteilung und Bildhierarchie werden gemeinsam über die
 - den Alterseindruck ausschließlich der Hauptperson,
 - zusätzliche Personen ausschließlich im Hintergrund,
 - die Kleidung und Farbpalette der Hauptperson,
-- eine sichtbar abweichende Kleidung der Begleitpersonen.
+- eine sichtbar abweichende Kleidung der Begleitpersonen,
+- optional sichtbare Geschlechtspräsentation, Hautton und Haarstruktur getrennt
+  für Haupt- und Begleitpersonen.
 
 Die Konstellationen unterscheiden zwischen einzelner Hauptperson,
 Hauptperson mit erwachsener Mentorin beziehungsweise erwachsenem Mentor,
@@ -105,6 +107,18 @@ Alters- und Kleidungsoptionen ergänzen passende dynamische Ausschlüsse im
 Negative Prompt. Dadurch kann ein gewünschter junger, aber eindeutig
 volljähriger Alterseindruck gestärkt werden, ohne eine später bewusst gewählte
 ältere Hauptperson durch einen statischen Negative Prompt auszuschließen.
+
+Die optionalen Repräsentationsfelder sind standardmäßig eingeklappt und ohne
+Vorgabe. Bewusst gibt es weder einen pauschalen Schalter `Diversität an/aus`
+noch einen vermeintlich messbaren Diversitätsgrad. Gesteuert werden nur
+beobachtbare Gestaltungsmerkmale pro fiktiver Rolle. Die Promptlogik trennt
+diese Merkmale ausdrücklich von Kompetenz, Hierarchie, Persönlichkeit und
+Tätigkeit und leitet daraus keine Ethnie, Nationalität, Religion oder soziale
+Herkunft ab. Bei einer einzelnen Hauptperson werden Angaben zu
+Begleitpersonen ausgeblendet und serverseitig verworfen. Ein zusätzliches
+menschliches Prüfkriterium macht stereotype oder tokenistische Zuordnungen
+sichtbar; in Stufe 2 gehören die gewählten Merkmale zur zu erhaltenden
+Bildkontinuität.
 
 Die Anwendung erzeugt keinen technischen „Multi-Prompt“, sondern einen
 strukturierten Render-Prompt und einen zugehörigen Negative Prompt. Für

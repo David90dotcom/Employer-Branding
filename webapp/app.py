@@ -1168,6 +1168,9 @@ def validate_prompt_component_compatibility(components, mode):
 
     if configuration_id == "solo":
         components["supportingOutfit"] = ""
+        components["supportGenderPresentation"] = ""
+        components["supportSkinTone"] = ""
+        components["supportHairTexture"] = ""
 
 
 def build_text_to_image_negative_prompt(
@@ -1194,6 +1197,25 @@ def build_text_to_image_negative_prompt(
 
         if negative_value:
             additions.append(negative_value)
+
+    representation_fields = (
+        "mainGenderPresentation",
+        "supportGenderPresentation",
+        "mainSkinTone",
+        "supportSkinTone",
+        "mainHairTexture",
+        "supportHairTexture"
+    )
+
+    if any(
+        components.get(field_id, "")
+        for field_id in representation_fields
+    ):
+        additions.append(
+            "racial stereotype, gender stereotype, tokenistic diversity "
+            "arrangement, culturally stereotyped styling, demographic role "
+            "hierarchy"
+        )
 
     if not additions:
         return TEXT_TO_IMAGE_NEGATIVE_PROMPT
@@ -1430,6 +1452,50 @@ def build_success_criteria(components, selected_options=None):
             )
         })
 
+    representation_field_ids = (
+        "mainGenderPresentation",
+        "supportGenderPresentation",
+        "mainSkinTone",
+        "supportSkinTone",
+        "mainHairTexture",
+        "supportHairTexture"
+    )
+    representation_field_labels = {
+        "mainGenderPresentation": "Hauptperson · Geschlechtspräsentation",
+        "supportGenderPresentation": "Begleitperson(en) · Geschlechtspräsentation",
+        "mainSkinTone": "Hauptperson · Hautton",
+        "supportSkinTone": "Begleitperson(en) · Hautton",
+        "mainHairTexture": "Hauptperson · Haarstruktur",
+        "supportHairTexture": "Begleitperson(en) · Haarstruktur"
+    }
+    representation_labels = []
+
+    for field_id in representation_field_ids:
+        if not components.get(field_id, ""):
+            continue
+
+        option_label = selected_option_label(selected_options, field_id)
+
+        if option_label:
+            representation_labels.append(
+                representation_field_labels[field_id] + ": " + option_label
+            )
+
+    if representation_labels:
+        criteria.append({
+            "prompt": (
+                "Selected visible representation traits must be followed "
+                "without linking them to competence, hierarchy, personality, "
+                "nationality, religion, social background, or workplace role."
+            ),
+            "label": (
+                "Die sichtbaren Repräsentationsmerkmale entsprechen der "
+                "Auswahl, ohne Kompetenz, Hierarchie, Persönlichkeit, "
+                "Nationalität, Religion oder berufliche Rolle daraus "
+                "abzuleiten: " + " · ".join(representation_labels) + "."
+            )
+        })
+
     if components.get("banner", {}).get("enabled"):
         criteria.append({
             "prompt": (
@@ -1481,12 +1547,27 @@ def build_text_to_image_render_sections(
         configuration_option.get("configuration_id", "") or ""
     ).strip()
 
-    for field_id in (
+    subject_field_ids = [
         "peopleConfiguration",
         "mainSubjectAge",
+        "mainGenderPresentation",
+        "mainSkinTone",
+        "mainHairTexture"
+    ]
+
+    if configuration_id != "solo":
+        subject_field_ids.extend([
+            "supportGenderPresentation",
+            "supportSkinTone",
+            "supportHairTexture"
+        ])
+
+    subject_field_ids.extend([
         "workContext",
         "backgroundPolicy"
-    ):
+    ])
+
+    for field_id in subject_field_ids:
         value = components.get(field_id, "")
 
         if value:
@@ -1495,6 +1576,19 @@ def build_text_to_image_render_sections(
     subjects_text = " ".join(subject_parts) or (
         "Show one clearly adult fictional person participating in a concrete "
         "workplace task in a credible, brand-neutral work environment."
+    )
+
+    representation_fields = (
+        "mainGenderPresentation",
+        "supportGenderPresentation",
+        "mainSkinTone",
+        "supportSkinTone",
+        "mainHairTexture",
+        "supportHairTexture"
+    )
+    representation_selected = any(
+        components.get(field_id, "")
+        for field_id in representation_fields
     )
 
     action_parts = []
@@ -1587,6 +1681,15 @@ def build_text_to_image_render_sections(
         "duplicate, or interchange the roles, ages, positions, or clothing of "
         "the main and supporting people."
     )
+
+    if representation_selected:
+        constraints_text += (
+            " Treat the selected visible appearance traits as independent of "
+            "competence, seniority, personality, responsibility, and workplace "
+            "role. Do not infer nationality, ethnicity, religion, or social "
+            "background from appearance. Do not use clothing, props, gestures, "
+            "or role hierarchy as cultural shorthand."
+        )
 
     aspect_ratio = components.get("aspectRatio", "16:9") or "16:9"
     output_parts = [
@@ -1850,8 +1953,8 @@ def build_prompt_chain_sections(components):
         (
             "The source image and every person shown in it are fully synthetic. "
             "Preserve the fictional main person's recognizable face structure, "
-            "hairstyle, apparent age, skin tone, natural body proportions, and "
-            "overall visual continuity."
+            "gender presentation, hairstyle, hair texture, apparent age, skin "
+            "tone, natural body proportions, and overall visual continuity."
         )
     ]
 

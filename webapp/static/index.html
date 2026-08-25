@@ -2207,20 +2207,26 @@
         }
       }
 
-      const supportingOutfitWrapper = fieldsGrid.querySelector(
-        '[data-field-id="supportingOutfit"]'
-      );
-      const supportingOutfitSelect = document.getElementById(
-        "supportingOutfit"
-      );
       const solo = configurationId === "solo";
 
-      if (supportingOutfitWrapper) {
-        supportingOutfitWrapper.hidden = solo;
-      }
+      for (const fieldId of [
+        "supportingOutfit",
+        "supportGenderPresentation",
+        "supportSkinTone",
+        "supportHairTexture"
+      ]) {
+        const wrapper = fieldsGrid.querySelector(
+          `[data-field-id="${fieldId}"]`
+        );
+        const select = document.getElementById(fieldId);
 
-      if (supportingOutfitSelect) {
-        supportingOutfitSelect.disabled = solo;
+        if (wrapper) {
+          wrapper.hidden = solo;
+        }
+
+        if (select) {
+          select.disabled = solo;
+        }
       }
     }
 
@@ -2314,6 +2320,7 @@
           "roleStyling"
         ]);
         const sectionContainers = new Map();
+        const fieldGroupContainers = new Map();
 
         function sectionForField(fieldId) {
           if (currentMode === "text_to_image") {
@@ -2368,6 +2375,46 @@
           section.append(heading, grid);
           fieldsGrid.appendChild(section);
           sectionContainers.set(sectionId, grid);
+
+          return grid;
+        }
+
+        function getFieldContainer(field, sectionId) {
+          const groupId = String(field.ui_group || "");
+
+          if (
+            currentMode !== "text_to_image" ||
+            groupId !== "representation"
+          ) {
+            return getSectionContainer(sectionId);
+          }
+
+          if (fieldGroupContainers.has(groupId)) {
+            return fieldGroupContainers.get(groupId);
+          }
+
+          const details = document.createElement("details");
+          details.className = "form-subsection";
+          details.dataset.fieldGroup = groupId;
+
+          const summary = document.createElement("summary");
+          summary.textContent = (
+            "Repräsentation der fiktiven Personen (optional)"
+          );
+
+          const description = document.createElement("p");
+          description.className = "form-subsection-description";
+          description.textContent = (
+            "Sichtbare Merkmale werden pro Rolle festgelegt und nicht mit " +
+            "Kompetenz, Aufgabe, Hierarchie oder Herkunft verknüpft."
+          );
+
+          const grid = document.createElement("div");
+          grid.className = "grid form-subsection-grid";
+
+          details.append(summary, description, grid);
+          getSectionContainer(sectionId).appendChild(details);
+          fieldGroupContainers.set(groupId, grid);
 
           return grid;
         }
@@ -2457,9 +2504,8 @@
             wrapper.appendChild(help);
           }
 
-          getSectionContainer(
-            sectionForField(field.id)
-          ).appendChild(wrapper);
+          const sectionId = sectionForField(field.id);
+          getFieldContainer(field, sectionId).appendChild(wrapper);
         }
 
         updateTextToImageCompatibility();
