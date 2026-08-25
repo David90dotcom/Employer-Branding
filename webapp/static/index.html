@@ -2213,7 +2213,8 @@
         "supportingOutfit",
         "supportGenderPresentation",
         "supportSkinTone",
-        "supportHairTexture"
+        "supportHairTexture",
+        "supportSmile"
       ]) {
         const wrapper = fieldsGrid.querySelector(
           `[data-field-id="${fieldId}"]`
@@ -2317,6 +2318,8 @@
           "pose",
           "gaze",
           "expression",
+          "mainSmile",
+          "supportSmile",
           "roleStyling"
         ]);
         const sectionContainers = new Map();
@@ -2383,8 +2386,8 @@
           const groupId = String(field.ui_group || "");
 
           if (
-            currentMode !== "text_to_image" ||
-            groupId !== "representation"
+            groupId !== "representation" &&
+            groupId !== "smile"
           ) {
             return getSectionContainer(sectionId);
           }
@@ -2397,17 +2400,29 @@
           details.className = "form-subsection";
           details.dataset.fieldGroup = groupId;
 
+          const groupMeta = groupId === "representation"
+            ? {
+                title: "Repräsentation der fiktiven Personen (optional)",
+                description: (
+                  "Sichtbare Merkmale werden pro Rolle festgelegt und nicht " +
+                  "mit Kompetenz, Aufgabe, Hierarchie oder Herkunft verknüpft."
+                )
+              }
+            : {
+                title: "Lächeln nach Rolle feinsteuern (optional)",
+                description: (
+                  "Haupt- und Begleitperson können unterschiedlich stark " +
+                  "lächeln. Blickführung, Tätigkeit und Identität bleiben " +
+                  "davon getrennt."
+                )
+              };
+
           const summary = document.createElement("summary");
-          summary.textContent = (
-            "Repräsentation der fiktiven Personen (optional)"
-          );
+          summary.textContent = groupMeta.title;
 
           const description = document.createElement("p");
           description.className = "form-subsection-description";
-          description.textContent = (
-            "Sichtbare Merkmale werden pro Rolle festgelegt und nicht mit " +
-            "Kompetenz, Aufgabe, Hierarchie oder Herkunft verknüpft."
-          );
+          description.textContent = groupMeta.description;
 
           const grid = document.createElement("div");
           grid.className = "grid form-subsection-grid";

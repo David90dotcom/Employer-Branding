@@ -1171,6 +1171,7 @@ def validate_prompt_component_compatibility(components, mode):
         components["supportGenderPresentation"] = ""
         components["supportSkinTone"] = ""
         components["supportHairTexture"] = ""
+        components["supportSmile"] = ""
 
 
 def build_text_to_image_negative_prompt(
@@ -1496,6 +1497,34 @@ def build_success_criteria(components, selected_options=None):
             )
         })
 
+    smile_labels = []
+
+    for field_id, role_label in (
+        ("mainSmile", "Hauptperson"),
+        ("supportSmile", "Begleitperson(en)")
+    ):
+        if not components.get(field_id, ""):
+            continue
+
+        option_label = selected_option_label(selected_options, field_id)
+
+        if option_label:
+            smile_labels.append(role_label + ": " + option_label)
+
+    if smile_labels:
+        criteria.append({
+            "prompt": (
+                "The selected role-specific smile intensities must be visible "
+                "without changing gaze direction, task credibility, or facial "
+                "identity."
+            ),
+            "label": (
+                "Die rollenspezifische Stärke des Lächelns entspricht der "
+                "Auswahl, ohne Blickführung, Tätigkeit oder Identität zu "
+                "verändern: " + " · ".join(smile_labels) + "."
+            )
+        })
+
     if components.get("banner", {}).get("enabled"):
         criteria.append({
             "prompt": (
@@ -1619,6 +1648,16 @@ def build_text_to_image_render_sections(
             "The main person " + "; ".join(face_parts) + "."
         )
 
+    main_smile = components.get("mainSmile", "")
+
+    if main_smile:
+        action_parts.append(ensure_sentence(main_smile))
+
+    support_smile = components.get("supportSmile", "")
+
+    if support_smile and configuration_id != "solo":
+        action_parts.append(ensure_sentence(support_smile))
+
     main_outfit = components.get("mainOutfit", "")
 
     if main_outfit:
@@ -1738,6 +1777,7 @@ def build_text_to_image_sections(components):
 
 def build_prompt_chain_success_criteria(components):
     optimization_goal = components.get("optimizationGoal", "")
+    selected_options = get_selected_ui_options(components, "prompt_chain")
     logo_enabled = components.get("logo", {}).get("enabled", False)
     logo_criterion = {
         "prompt": (
@@ -1856,6 +1896,38 @@ def build_prompt_chain_success_criteria(components):
             }
         )
 
+    smile_labels = []
+
+    for field_id, role_label in (
+        ("mainSmile", "Hauptperson"),
+        ("supportSmile", "Mentor:in / Begleitperson(en)")
+    ):
+        if not components.get(field_id, ""):
+            continue
+
+        option_label = selected_option_label(selected_options, field_id)
+
+        if option_label:
+            smile_labels.append(role_label + ": " + option_label)
+
+    if smile_labels:
+        criteria.insert(
+            3,
+            {
+                "prompt": (
+                    "Only the selected role-specific smile intensities may "
+                    "change; facial identity, gaze direction, head position, "
+                    "pose, and all unrelated image elements must remain stable."
+                ),
+                "label": (
+                    "Nur die gewählte Stärke des Lächelns wird angepasst; "
+                    "Identität, Blickrichtung, Kopfhaltung, Pose und alle "
+                    "übrigen Bildelemente bleiben stabil: " +
+                    " · ".join(smile_labels) + "."
+                )
+            }
+        )
+
     campaign_space_position = selected_campaign_space_position(components)
 
     if campaign_space_position:
@@ -1899,6 +1971,11 @@ def build_prompt_chain_sections(components):
         ("Pose and body action", components.get("pose", "")),
         ("Gaze", components.get("gaze", "")),
         ("Facial expression", components.get("expression", "")),
+        ("Main-subject smile intensity", components.get("mainSmile", "")),
+        (
+            "Mentor or supporting-person smile intensity",
+            components.get("supportSmile", "")
+        ),
         ("Clothing and role styling", components.get("roleStyling", "")),
         ("Framing", components.get("framing", "")),
         ("Usable campaign-copy area", components.get("campaignSpace", "")),

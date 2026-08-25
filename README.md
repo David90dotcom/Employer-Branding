@@ -90,6 +90,7 @@ Personenzahl, Rollenverteilung und Bildhierarchie werden gemeinsam über die
 - zusätzliche Personen ausschließlich im Hintergrund,
 - die Kleidung und Farbpalette der Hauptperson,
 - eine sichtbar abweichende Kleidung der Begleitpersonen,
+- die Stärke des Lächelns getrennt für Haupt- und Begleitpersonen,
 - optional sichtbare Geschlechtspräsentation, Hautton und Haarstruktur getrennt
   für Haupt- und Begleitpersonen.
 
@@ -166,7 +167,8 @@ eine tatsächliche Bildänderung oder ein Freitextauftrag bleibt erforderlich;
 die voreingestellte Änderungsstärke allein startet keine Bearbeitung.
 
 Ausgewählt werden können Änderungsstärke, Erhaltungsfokus, Tätigkeit,
-Personenzahl und Interaktion, Pose, Blick, Gesichtsausdruck, Rollenwirkung,
+Personenzahl und Interaktion, Pose, Blick, Grundausdruck, getrennte
+Lächelintensitäten für Haupt- und Begleitpersonen, Rollenwirkung,
 Bildausschnitt, nutzbare Kampagnentextfläche, Gestaltung dieser Fläche,
 Bildwirkung sowie eine konkrete Qualitätskorrektur. Bildausschnitt und
 Textfläche sind bewusst getrennt: So lassen sich beispielsweise ein

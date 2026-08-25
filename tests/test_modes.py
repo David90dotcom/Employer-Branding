@@ -533,6 +533,9 @@ class GenerationModeTests(unittest.TestCase):
         raw["supportHairTexture"] = by_id[
             "supportHairTexture"
         ]["options"][1]["value"]
+        raw["supportSmile"] = by_id[
+            "supportSmile"
+        ]["options"][2]["value"]
 
         components = module.normalize_prompt_components(
             raw,
@@ -547,6 +550,7 @@ class GenerationModeTests(unittest.TestCase):
         self.assertEqual(components["supportGenderPresentation"], "")
         self.assertEqual(components["supportSkinTone"], "")
         self.assertEqual(components["supportHairTexture"], "")
+        self.assertEqual(components["supportSmile"], "")
         self.assertNotIn(
             "Every supporting person wears",
             package["render_prompt"]
@@ -640,6 +644,60 @@ class GenerationModeTests(unittest.TestCase):
         self.assertIn("gender presentation", prompt)
         self.assertIn("hair texture", prompt)
         self.assertIn("skin tone", prompt)
+
+    def test_role_specific_smile_controls_build_distinct_stage_one_prompt(self):
+        fields = {
+            field["id"]: field
+            for field in module.load_ui_fields("text_to_image")
+        }
+        raw = default_components_for_mode("text_to_image")
+
+        for field_id, label in (
+            ("mainSmile", "Kaum angedeutet"),
+            ("supportSmile", "Deutlich freundlich")
+        ):
+            raw[field_id] = next(
+                option["value"]
+                for option in fields[field_id]["options"]
+                if option["label"] == label
+            )
+
+        components = module.normalize_prompt_components(raw, "text_to_image")
+        package = module.build_prompt_package(components, "text_to_image")
+
+        self.assertIn("barely perceptible closed-mouth smile", package["render_prompt"])
+        self.assertIn("clearly visible but restrained natural smiles", package["render_prompt"])
+        self.assertTrue(any(
+            "rollenspezifische Stärke des Lächelns" in criterion["label"]
+            for criterion in package["success_criteria"]
+        ))
+
+    def test_role_specific_smile_controls_build_focused_chain_edit(self):
+        fields = {
+            field["id"]: field
+            for field in module.load_ui_fields("prompt_chain")
+        }
+        raw = default_components_for_mode("prompt_chain")
+        raw["mainSmile"] = next(
+            option["value"]
+            for option in fields["mainSmile"]["options"]
+            if option["label"] == "Leichtes natürliches Lächeln"
+        )
+        raw["supportSmile"] = next(
+            option["value"]
+            for option in fields["supportSmile"]["options"]
+            if option["label"] == "Kaum angedeutetes Lächeln"
+        )
+        components = module.normalize_prompt_components(raw, "prompt_chain")
+        package = module.build_prompt_package(components, "prompt_chain")
+
+        self.assertIn("Main-subject smile intensity", package["render_prompt"])
+        self.assertIn("Mentor or supporting-person smile intensity", package["render_prompt"])
+        self.assertIn("Do not add a person", package["render_prompt"])
+        self.assertTrue(any(
+            "Stärke des Lächelns" in criterion["label"]
+            for criterion in package["success_criteria"]
+        ))
 
     def test_prompt_chain_uses_a_saved_synthetic_source(self):
         self.assertTrue(
@@ -736,6 +794,8 @@ class GenerationModeTests(unittest.TestCase):
                 "pose",
                 "gaze",
                 "expression",
+                "mainSmile",
+                "supportSmile",
                 "roleStyling",
                 "framing",
                 "campaignSpace",
@@ -1458,6 +1518,12 @@ class GenerationModeTests(unittest.TestCase):
         self.assertIn('details.className = "form-subsection"', html)
         self.assertIn('groupId !== "representation"', html)
         self.assertNotIn("Diversitätsgrad", html)
+
+    def test_smile_controls_use_a_collapsed_optional_ui_group(self):
+        html = module.INDEX_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("Lächeln nach Rolle feinsteuern (optional)", html)
+        self.assertIn('groupId !== "smile"', html)
 
     def test_expired_temporary_results_are_removed(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

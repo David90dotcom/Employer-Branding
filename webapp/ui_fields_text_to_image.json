@@ -525,8 +525,9 @@
   },
   {
     "id": "expression",
-    "label": "Gesichtsausdruck / Ausstrahlung",
+    "label": "Grundausdruck der Hauptperson",
     "type": "select",
+    "help": "Legt die grundlegende Ausstrahlung fest. Die Stärke des Lächelns kann darunter getrennt feinjustiert werden.",
     "options": [
       {
         "label": "Keine Vorgabe",
@@ -534,7 +535,7 @@
       },
       {
         "label": "Natürlich freundlich",
-        "value": "a natural slight smile, relaxed eyes, and credible facial detail"
+        "value": "a naturally friendly, relaxed expression with open facial features and credible facial detail"
       },
       {
         "label": "Ruhig selbstsicher",
@@ -552,6 +553,66 @@
       {
         "label": "Offen und einladend",
         "value": "an open approachable expression with relaxed cheeks and authentic warmth"
+      }
+    ]
+  },
+  {
+    "id": "mainSmile",
+    "label": "Lächeln der Hauptperson",
+    "type": "select",
+    "ui_group": "smile",
+    "help": "Ergänzt den Grundausdruck, ohne Blickführung oder sichtbare Tätigkeit zu verändern.",
+    "options": [
+      {
+        "label": "Keine zusätzliche Vorgabe",
+        "value": "",
+        "default": true
+      },
+      {
+        "label": "Neutral · kein Lächeln",
+        "value": "The main subject keeps a relaxed neutral mouth without smiling while remaining attentive to the visible task."
+      },
+      {
+        "label": "Kaum angedeutet",
+        "value": "The main subject shows a barely perceptible closed-mouth smile with only a subtle lift at the corners of the mouth while remaining attentive to the visible task."
+      },
+      {
+        "label": "Leicht und natürlich",
+        "value": "The main subject shows a slight natural closed-mouth smile with relaxed eyes and cheeks while keeping a credible task-focused expression."
+      },
+      {
+        "label": "Deutlich freundlich",
+        "value": "The main subject shows a clearly visible but restrained natural smile with relaxed eyes and cheeks; avoid a broad grin or staged enthusiasm."
+      }
+    ]
+  },
+  {
+    "id": "supportSmile",
+    "label": "Lächeln der Begleitperson(en)",
+    "type": "select",
+    "ui_group": "smile",
+    "help": "Wird bei einer einzelnen Hauptperson ausgeblendet. Bei mehreren Begleitpersonen bleiben kleine natürliche Unterschiede erhalten.",
+    "options": [
+      {
+        "label": "Keine zusätzliche Vorgabe",
+        "value": "",
+        "default": true
+      },
+      {
+        "label": "Neutral · kein Lächeln",
+        "value": "The visible mentor or supporting adults keep relaxed neutral mouths without smiling while remaining attentive to the same task."
+      },
+      {
+        "label": "Kaum angedeutet",
+        "value": "The visible mentor or supporting adults show barely perceptible closed-mouth smiles while remaining attentive to the same task; preserve subtle natural variation between faces."
+      },
+      {
+        "label": "Leicht und natürlich",
+        "value": "The visible mentor or supporting adults show slight natural closed-mouth smiles with relaxed eyes and cheeks while remaining focused on the same task; preserve subtle natural variation between faces."
+      },
+      {
+        "label": "Deutlich freundlich",
+        "value": "The visible mentor or supporting adults show clearly visible but restrained natural smiles; avoid identical expressions, broad grins, or staged enthusiasm."
       }
     ]
   },

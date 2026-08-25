@@ -208,8 +208,8 @@
   },
   {
     "id": "expression",
-    "label": "Gesichtsausdruck / Ausstrahlung",
-    "help": "Glaubwürdige, zurückhaltende Ausdrücke vermeiden übertriebene Werbeästhetik.",
+    "label": "Grundausdruck der Hauptperson",
+    "help": "Glaubwürdige, zurückhaltende Ausdrücke vermeiden übertriebene Werbeästhetik. Die Stärke des Lächelns wird darunter getrennt gesteuert.",
     "options": [
       {
         "label": "Unverändert lassen",
@@ -224,8 +224,8 @@
         "value": "Use a calm, confident expression with steady eyes, a relaxed mouth, and credible professional presence."
       },
       {
-        "label": "Leicht natürlich lächelnd",
-        "value": "Use a slight natural smile with relaxed eyes and cheeks, avoiding exaggerated enthusiasm."
+        "label": "Gelöst und freundlich",
+        "value": "Use a relaxed, friendly expression with open facial features and credible professional presence."
       },
       {
         "label": "Motiviert und aufmerksam",
@@ -234,6 +234,64 @@
       {
         "label": "Offen und ansprechbar",
         "value": "Use an open, approachable expression with authentic warmth and restrained campaign aesthetics."
+      }
+    ]
+  },
+  {
+    "id": "mainSmile",
+    "label": "Lächeln der Hauptperson",
+    "help": "Verändert nur Mund, Wangen und Augenpartie der Hauptperson; Identität, Blickrichtung und Pose bleiben erhalten.",
+    "ui_group": "smile",
+    "options": [
+      {
+        "label": "Unverändert lassen",
+        "value": "",
+        "default": true
+      },
+      {
+        "label": "Neutralisieren",
+        "value": "Adjust only the main person's facial expression to a relaxed neutral mouth without a smile. Preserve facial identity, gaze direction, head position, pose, and every unrelated image element."
+      },
+      {
+        "label": "Kaum angedeutetes Lächeln",
+        "value": "Adjust only the main person's facial expression to a barely perceptible closed-mouth smile with a subtle lift at the corners of the mouth. Preserve facial identity, gaze direction, head position, pose, and every unrelated image element."
+      },
+      {
+        "label": "Leichtes natürliches Lächeln",
+        "value": "Adjust only the main person's facial expression to a slight natural closed-mouth smile with relaxed eyes and cheeks. Preserve facial identity, gaze direction, head position, pose, and every unrelated image element."
+      },
+      {
+        "label": "Deutlich freundlich",
+        "value": "Adjust only the main person's facial expression to a clearly visible but restrained natural smile. Preserve facial identity, gaze direction, head position, pose, and every unrelated image element; avoid a broad grin or staged enthusiasm."
+      }
+    ]
+  },
+  {
+    "id": "supportSmile",
+    "label": "Lächeln von Mentor:in / Begleitperson(en)",
+    "help": "Wirkt nur auf bereits sichtbare Begleitpersonen und fügt keine neue Person hinzu.",
+    "ui_group": "smile",
+    "options": [
+      {
+        "label": "Unverändert lassen",
+        "value": "",
+        "default": true
+      },
+      {
+        "label": "Neutralisieren",
+        "value": "If a mentor or supporting adult is already visible, adjust only that person's facial expression to a relaxed neutral mouth without a smile. Do not add a person. Preserve identity, gaze direction, head position, pose, and every unrelated image element."
+      },
+      {
+        "label": "Kaum angedeutetes Lächeln",
+        "value": "If a mentor or supporting adult is already visible, adjust only that person's facial expression to a barely perceptible closed-mouth smile. Do not add a person. Preserve identity, gaze direction, head position, pose, and every unrelated image element."
+      },
+      {
+        "label": "Leichtes natürliches Lächeln",
+        "value": "If a mentor or supporting adult is already visible, adjust only that person's facial expression to a slight natural closed-mouth smile with relaxed eyes and cheeks. Do not add a person. Preserve identity, gaze direction, head position, pose, and every unrelated image element."
+      },
+      {
+        "label": "Deutlich freundlich",
+        "value": "If a mentor or supporting adult is already visible, adjust only that person's facial expression to a clearly visible but restrained natural smile. Do not add a person. Preserve identity, gaze direction, head position, pose, and every unrelated image element; avoid a broad grin or staged enthusiasm."
       }
     ]
   },
