@@ -881,7 +881,8 @@ def normalize_banner_settings(raw_components):
         "light_panel",
         "brand_bar",
         "gradient_bottom",
-        "minimal_shadow"
+        "minimal_shadow",
+        "plain_text"
     }
 
     allowed_fonts = {
@@ -2818,7 +2819,7 @@ def render_banner_on_image(image_bytes, banner):
     else:
         text_fill = (255, 255, 255, 255)
         sub_fill = (245, 245, 245, 238)
-        shadow = True
+        shadow = style != "plain_text"
 
     image = Image.alpha_composite(
         image,

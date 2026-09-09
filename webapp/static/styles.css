@@ -537,6 +537,15 @@ input[type="range"] {
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85);
 }
 
+.banner-text-box-preview.preview-plain-text {
+  background: transparent;
+  box-shadow: none;
+}
+
+.banner-text-box-preview.preview-plain-text .banner-preview-editor {
+  text-shadow: none;
+}
+
 .banner-text-box-preview.preview-gradient-bottom {
   background: linear-gradient(
     180deg,

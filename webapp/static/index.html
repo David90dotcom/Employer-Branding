@@ -225,6 +225,7 @@
               <option value="brand_bar">Farbiger Markenbalken</option>
               <option value="gradient_bottom">Verlauf unten</option>
               <option value="minimal_shadow">Minimal mit Schatten</option>
+              <option value="plain_text">Normale Schrift ohne Schatten</option>
             </select>
           </div>
 
@@ -1540,6 +1541,7 @@
       bannerTextBoxPreview.classList.remove(
         "preview-light-panel",
         "preview-minimal-shadow",
+        "preview-plain-text",
         "preview-gradient-bottom"
       );
       bannerTextBoxPreview.style.background = "";
@@ -1548,6 +1550,8 @@
         bannerTextBoxPreview.classList.add("preview-light-panel");
       } else if (bannerStyle.value === "minimal_shadow") {
         bannerTextBoxPreview.classList.add("preview-minimal-shadow");
+      } else if (bannerStyle.value === "plain_text") {
+        bannerTextBoxPreview.classList.add("preview-plain-text");
       } else if (bannerStyle.value === "gradient_bottom") {
         bannerTextBoxPreview.classList.add("preview-gradient-bottom");
       } else if (bannerStyle.value === "brand_bar") {
