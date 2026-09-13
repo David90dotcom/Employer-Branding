@@ -1,17 +1,28 @@
 # Employer Branding Prompt Lab
 
-Lokale Webanwendung zur KI-gestützten Überarbeitung von Employer-Branding-Motiven. Die Anwendung erstellt aus ausgewählten Parametern einen strukturierten Prompt, übergibt Bild und Prompt an ComfyUI und ergänzt auf Wunsch Kampagnentext sowie die Kennzeichnung `AI GENERATED`.
+Webanwendung zur KI-gestützten Erstellung und Überarbeitung von Employer-Branding-Motiven. Aus ausgewählten Parametern entsteht ein strukturierter Prompt. Als Bildanbieter kann entweder die OpenAI Images API oder optional eine lokale ComfyUI-Installation verwendet werden.
 
 ## Voraussetzungen
 
+### Betrieb über die OpenAI Images API
+
 - Windows 10 oder 11
 - Python 3.10 oder 3.11
-- aktuelle ComfyUI-Installation mit funktionierender NVIDIA-GPU
+- OpenAI-API-Schlüssel mit verfügbarem Guthaben
 
-Der mitgelieferte Workflow benötigt diese Modelldateien:
+Für diesen Betrieb sind **keine ComfyUI-Installation, keine NVIDIA-GPU und keine lokalen Bildmodelle** erforderlich.
+
+### Optional: lokaler Betrieb über ComfyUI
+
+Nur für die lokale Bildgenerierung werden zusätzlich benötigt:
+
+- aktuelle ComfyUI-Installation
+- geeignete NVIDIA-GPU
+- folgende Modelldateien:
 
 | Datei | Ordner innerhalb von `ComfyUI/models` |
 | --- | --- |
+| `qwen_image_2512_fp8_e4m3fn.safetensors` | `diffusion_models` |
 | `qwen_image_edit_2509_fp8_e4m3fn.safetensors` | `diffusion_models` |
 | `qwen_2.5_vl_7b_fp8_scaled.safetensors` | `text_encoders` |
 | `qwen_image_vae.safetensors` | `vae` |
@@ -34,14 +45,43 @@ Der mitgelieferte Workflow benötigt diese Modelldateien:
    webapp_env\Scripts\python.exe -m pip install -r requirements.txt
    ```
 
-3. In `main.py` diese beiden Pfade prüfen und bei Bedarf anpassen:
+3. Konfigurationsdatei anlegen:
 
-   ```python
-   COMFY_DIR = Path(r"C:\AI\image\ComfyUI")
-   COMFY_PYTHON = COMFY_DIR / "venv" / "Scripts" / "python.exe"
+   ```powershell
+   Copy-Item .env.example .env
    ```
 
-4. ComfyUI einmal separat starten und prüfen. Der Workflow wird später automatisch aus `webapp/workflow_template.json` geladen und muss nicht manuell importiert werden.
+## OpenAI-API einrichten
+
+Die Datei `.env` öffnen und folgende Werte eintragen:
+
+```env
+OPENAI_API_KEY=DEIN_OPENAI_API_SCHLUESSEL
+OPENAI_IMAGE_MODEL=gpt-image-2
+OPENAI_IMAGE_QUALITY=medium
+EMPLOYER_BRANDING_IMAGE_PROVIDER=openai
+EMPLOYER_BRANDING_SKIP_COMFYUI=1
+```
+
+Der API-Schlüssel bleibt ausschließlich in der lokalen `.env` und darf nicht auf GitHub hochgeladen werden. Die Datei wird durch `.gitignore` ausgeschlossen.
+
+## Optional: ComfyUI einrichten
+
+Für den lokalen Betrieb in `.env` einstellen:
+
+```env
+EMPLOYER_BRANDING_IMAGE_PROVIDER=local
+EMPLOYER_BRANDING_SKIP_COMFYUI=0
+```
+
+Anschließend in `main.py` die Pfade zur eigenen ComfyUI-Installation prüfen:
+
+```python
+COMFY_DIR = Path(r"C:\AI\image\ComfyUI")
+COMFY_PYTHON = COMFY_DIR / "venv" / "Scripts" / "python.exe"
+```
+
+Die Workflows werden automatisch aus dem Ordner `webapp` geladen.
 
 ## Start
 
@@ -51,33 +91,43 @@ Im Projektordner ausführen:
 webapp_env\Scripts\python.exe main.py
 ```
 
-Der Launcher startet ComfyUI und die Webanwendung. Danach öffnet sich automatisch:
+Im OpenAI-only-Betrieb startet ausschließlich die Webanwendung. Bei lokaler Konfiguration startet der Launcher zusätzlich ComfyUI. Anschließend öffnet sich automatisch:
 
-`http://127.0.0.1:8000`
+`http://127.0.0.1:8765`
 
 ## Bedienung
 
-1. Ausgangsbild hochladen.
-2. gewünschte Vorgaben auswählen.
-3. optional Kampagnentext aktivieren.
-4. Prompt-Vorschau prüfen.
-5. Bildgenerierung starten und Ergebnis herunterladen.
+1. Bildanbieter und Arbeitsmodus auswählen.
+2. gewünschte Kampagnen- und Bildparameter festlegen.
+3. Prompt-Vorschau prüfen.
+4. Bild erzeugen oder einen gespeicherten synthetischen Entwurf weiterbearbeiten.
+5. optional Kampagnentext ergänzen und Ergebnis herunterladen.
 
-Die erzeugten Bilder werden zusätzlich unter `webapp/static/generated` gespeichert.
+Erzeugte Bilder werden zusätzlich unter `webapp/static/generated` gespeichert.
 
 ## Beenden
 
-ComfyUI und Webanwendung verwenden die Ports `8188` und `8000`. Zum Beenden in PowerShell:
+Die Webanwendung verwendet Port `8765`, ComfyUI optional Port `8188`.
+
+OpenAI-only-Betrieb beenden:
 
 ```powershell
-Get-NetTCPConnection -LocalPort 8000,8188 -State Listen |
+Get-NetTCPConnection -LocalPort 8765 -State Listen |
+  ForEach-Object { Stop-Process -Id $_.OwningProcess }
+```
+
+Webanwendung und lokale ComfyUI-Instanz beenden:
+
+```powershell
+Get-NetTCPConnection -LocalPort 8765,8188 -State Listen |
   ForEach-Object { Stop-Process -Id $_.OwningProcess }
 ```
 
 ## Wenn etwas nicht startet
 
-- **Pfad nicht gefunden:** Pfade zu ComfyUI und Python in `main.py` kontrollieren.
-- **Port bereits belegt:** laufende Instanz beenden oder Ports in `main.py` ändern.
-- **Modell fehlt:** Dateiname und Modellordner mit der Tabelle oben vergleichen.
-- **Node fehlt:** ComfyUI aktualisieren und erneut starten.
-- **Weitere Fehler:** `comfy_start.log` und `webapp_start.log` im Projektordner öffnen.
+- **OpenAI nicht verfügbar:** API-Schlüssel und Einstellungen in `.env` prüfen.
+- **API-Anfrage scheitert:** API-Guthaben, Modellname und Internetverbindung prüfen.
+- **Port bereits belegt:** laufende Instanz beenden oder den Port in `main.py` ändern.
+- **Lokales Modell fehlt:** Dateiname und Modellordner mit der Tabelle vergleichen.
+- **ComfyUI-Node fehlt:** ComfyUI aktualisieren und erneut starten.
+- **Weitere Fehler:** `webapp_start.log` und bei lokalem Betrieb `comfy_start.log` öffnen.
